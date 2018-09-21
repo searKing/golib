@@ -1,30 +1,27 @@
 package slice
 
+import (
+	"github.com/searKing/golib/util/object"
+	"github.com/searKing/golib/util/optional"
+)
 
-
-// IndexFunc returns the index into s of the first Unicode
-// code point satisfying f(c), or -1 if none do.
+// ReduceFunc calls a defined callback function on each element of an array, and returns an array that contains the results.
 func ReduceFunc(s []interface{}, f func(left, right interface{}) interface{}) interface{} {
-	return reduceFunc(s, f)
+	return reduceFunc(s, f).Get()
 }
 
-// indexFunc is the same as IndexFunc except that if
-// truth==false, the sense of the predicate function is
-// inverted.
+// reduceFunc is the same as ReduceFunc
+func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}, identity ...interface{}) *optional.Optional {
+	object.RequireNonNil(s, "reduceFunc called on nil slice")
+	object.RequireNonNil(s, "reduceFunc called on nil callfn")
 
-// Calls a defined callback function on each element of an array, and returns an array that contains the results.
-// @param f A function that accepts up to three arguments. The map method calls the f function one time for each element in the array.
-// @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
-
-func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}) Optional {
-	if s == nil {
-		panic("reduce called on nil slice")
-	}
-	if f == nil {
-		panic("reduce called on nil callfn")
-	}
 	var foundAny bool
 	var result interface{}
+
+	if (identity != nil || len(identity) != 0) {
+		foundAny = true;
+		result = identity;
+	}
 	for _, r := range s {
 		if (!foundAny) {
 			foundAny = true;
@@ -34,9 +31,7 @@ func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}) Op
 		}
 	}
 	if foundAny {
-		return Optional{
-			value: result,
-		}
+		return optional.Of(result)
 	}
-	return OptionalEmpty
+	return optional.Empty()
 }

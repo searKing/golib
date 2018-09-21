@@ -1,26 +1,21 @@
 package slice
 
-import "strings"
+import "github.com/searKing/golib/util/object"
 
-func sd() {
-	strings.IndexFunc()
+//Returns a stream consisting of the results of applying the given
+//function to the elements of this stream.
+func MapFunc(s []interface{}, f func(interface{}) interface{}) []interface{} {
+	return mapFunc(s, f)
 }
 
-// IndexFunc returns the index into s of the first Unicode
-// code point satisfying f(c), or -1 if none do.
-func MapFunc(s []interface{}, f func(interface{}) bool) []interface{} {
-	return mapFunc(s, f, true)
-}
+// mapFunc is the same as MapFunc
+func mapFunc(s []interface{}, f func(interface{}) interface{}) []interface{} {
+	object.RequireNonNil(s, "mapFunc called on nil slice")
+	object.RequireNonNil(s, "mapFunc called on nil callfn")
 
-// indexFunc is the same as IndexFunc except that if
-// truth==false, the sense of the predicate function is
-// inverted.
-func mapFunc(s []interface{}, f func(interface{}) bool, truth bool) []interface{} {
 	var sMapped = []interface{}{}
 	for _, r := range s {
-		if f(r) == truth {
-			sMapped = append(sMapped, r)
-		}
+		sMapped = append(sMapped, f(r))
 	}
 	return sMapped
 }
