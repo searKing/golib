@@ -2,10 +2,11 @@
 
 package error
 
-// Assert panics if cond is false. Truef formats the panic message using the
-// default formats for its operands.
+// Assert panics ignored.
 func Assert(cond bool, a ...interface{}) {}
 
-// Assertf panics if cond is false. Truef formats the panic message according to a
-// format specifier.
+// Assertln panics ignored.
+func Assertln(cond bool, a ...interface{}) {}
+
+// Assertf panics ignored.
 func Assertf(cond bool, format string, a ...interface{}) {}
