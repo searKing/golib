@@ -19,7 +19,7 @@ type Supplier interface {
 // IsNil returns {@code true} if the provided reference is {@code nil} otherwise
 // returns {@code false}.
 func IsNil(obj interface{}) bool {
-	if IsNilAble(obj) {
+	if IsNilable(obj) {
 		return reflect.ValueOf(obj).IsNil()
 	}
 	return false
@@ -33,9 +33,7 @@ func NoneNil(obj interface{}) bool {
 
 // IsNil returns {@code true} if the provided reference can be assigned {@code nil} otherwise
 // returns {@code false}.
-func IsNilAble(obj interface{}) (canBeNil bool) {
-	reflect.ValueOf(obj).IsNil()
-
+func IsNilable(obj interface{}) (canBeNil bool) {
 	defer func() {
 		// As we can not access v.flag&reflect.flagMethod&v.ptr
 		// So we use recover() instead
@@ -43,6 +41,8 @@ func IsNilAble(obj interface{}) (canBeNil bool) {
 			canBeNil = false
 		}
 	}()
+	reflect.ValueOf(obj).IsNil()
+
 	canBeNil = true
 	return
 }
