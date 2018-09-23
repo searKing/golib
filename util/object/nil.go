@@ -7,6 +7,7 @@ import (
 )
 
 type ErrorNilPointer error
+type ErrorMissMatch error
 
 var (
 	errorNilPointer = errors.New("nil pointer")
@@ -95,4 +96,17 @@ func IsEmptyValue(obj interface{}) bool {
 		return v.IsNil()
 	}
 	return false
+}
+
+// RequireNonNil checks that the specified object reference is not {@code nil}. This
+// method is designed primarily for doing parameter validation in methods
+// and constructors
+func RequireEqual(actual, expected interface{}, msg ...string) interface{} {
+	if msg == nil {
+		msg = []string{"miss match"}
+	}
+	if !Equals(actual,expected) {
+		panic(ErrorMissMatch(errors.New(strings.Join(msg, ""))))
+	}
+	return actual
 }
