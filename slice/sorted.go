@@ -6,8 +6,8 @@ import (
 	"sort"
 )
 
-// SortedFunc returns a stream consisting of the distinct elements (according to
-// {@link Object#equals(Object)}) of this stream.
+// SortedFunc returns a slice consisting of the distinct elements (according to
+// {@link Object#equals(Object)}) of this slice.
 // s: Accept Array、Slice、String(as []byte if ifStringAsRune else []rune)
 func SortedFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
 	sorted := sortedFunc(Of(s, ifStringAsRune...), f)

@@ -2,8 +2,8 @@ package slice
 
 import "github.com/searKing/golib/util/object"
 
-// DistinctFunc returns a stream consisting of the distinct elements (according to
-// {@link Object#equals(Object)}) of this stream.
+// DistinctFunc returns a slice consisting of the distinct elements (according to
+// {@link Object#equals(Object)}) of this slice.
 func DistinctFunc(s []interface{}, f func(interface{}, interface{}) int) []interface{} {
 	return distinctFunc(s, f)
 }
