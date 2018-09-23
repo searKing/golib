@@ -6,7 +6,7 @@ import "github.com/searKing/golib/util/object"
 // or an empty {@code Optional} if the stream is empty.  If the stream has
 // no encounter order, then any element may be returned.
 func FindFirstFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) interface{} {
-	return anyMatchFunc(Of(s, ifStringAsRune...), f, true)
+	return findFirstFunc(Of(s, ifStringAsRune...), f, true)
 }
 
 // findFirstFunc is the same as FindFirstFunc.
