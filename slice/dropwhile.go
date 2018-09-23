@@ -13,8 +13,8 @@ func DropWhileFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bo
 
 // dropWhileFunc is the same as DropWhileFunc.
 func dropWhileFunc(s []interface{}, f func(interface{}) bool, truth bool) []interface{} {
-	object.RequireNonNil(s, "takeWhileFunc called on nil slice")
-	object.RequireNonNil(f, "takeWhileFunc called on nil callfn")
+	object.RequireNonNil(s, "dropWhileFunc called on nil slice")
+	object.RequireNonNil(f, "dropWhileFunc called on nil callfn")
 
 	var sTaken = []interface{}{}
 	dropFound := false
