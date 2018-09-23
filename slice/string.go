@@ -9,8 +9,8 @@ func isAsRune(ifStringAsRune ...bool) bool {
 	return false
 }
 
-func normalizeSlice(s []interface{}, ifStringAsRune ...bool) interface{} {
-	if kind := reflect.ValueOf(s).Kind(); kind != reflect.String {
+func normalizeSlice(s []interface{}, as interface{}, ifStringAsRune ...bool) interface{} {
+	if kind := reflect.ValueOf(as).Kind(); kind != reflect.String {
 		return s
 	}
 
@@ -29,8 +29,8 @@ func normalizeSlice(s []interface{}, ifStringAsRune ...bool) interface{} {
 	}
 	return string(bs)
 }
-func normalizeElem(s, elem interface{}, ifStringAsRune ...bool) interface{} {
-	if kind := reflect.ValueOf(s).Kind(); kind != reflect.String {
+func normalizeElem(elem, as interface{}, ifStringAsRune ...bool) interface{} {
+	if kind := reflect.ValueOf(as).Kind(); kind != reflect.String {
 		return elem
 	}
 

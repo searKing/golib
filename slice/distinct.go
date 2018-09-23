@@ -5,7 +5,7 @@ import "github.com/searKing/golib/util/object"
 // DistinctFunc returns a slice consisting of the distinct elements (according to
 // {@link Object#equals(Object)}) of this slice.
 func DistinctFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(distinctFunc(Of(s, ifStringAsRune...), f))
+	return normalizeSlice(distinctFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
 }
 
 // distinctFunc is the same as DistinctFunc except that if

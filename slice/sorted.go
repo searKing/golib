@@ -9,7 +9,7 @@ import (
 // {@link Object#equals(Object)}) of this slice.
 // s: Accept Array、Slice、String(as []byte if ifStringAsRune else []rune)
 func SortedFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(sortedFunc(Of(s, ifStringAsRune...), f))
+	return normalizeSlice(sortedFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
 }
 
 // sortedFunc is the same as SortedFunc except that if

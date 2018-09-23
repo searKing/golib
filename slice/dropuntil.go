@@ -6,7 +6,7 @@ package slice
 // unordered, a slice consisting of the remaining elements of this slice
 // after dropping a subset of elements that match the given predicate.
 func DropUntilFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(dropUntilFunc(Of(s, ifStringAsRune...), f, true))
+	return normalizeSlice(dropUntilFunc(Of(s, ifStringAsRune...), f, true), s, ifStringAsRune...)
 }
 
 // dropUntilFunc is the same as DropUntilFunc.

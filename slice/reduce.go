@@ -7,7 +7,7 @@ import (
 
 // ReduceFunc calls a defined callback function on each element of an array, and returns an array that contains the results.
 func ReduceFunc(s []interface{}, f func(left, right interface{}) interface{}, ifStringAsRune ...bool) interface{} {
-	return normalizeElem(s, reduceFunc(Of(s, ifStringAsRune...), f))
+	return normalizeElem(reduceFunc(Of(s, ifStringAsRune...), f), s)
 
 }
 

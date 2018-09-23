@@ -7,7 +7,7 @@ import "github.com/searKing/golib/util/object"
 // If this slice contains fewer than {@code n} elements then an
 // empty slice will be returned.
 func SkipFunc(s interface{}, n int, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(skipFunc(Of(s, ifStringAsRune...), n))
+	return normalizeSlice(skipFunc(Of(s, ifStringAsRune...), n), s, ifStringAsRune...)
 }
 
 // skipFunc is the same as SkipFunc.
