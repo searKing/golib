@@ -2,7 +2,7 @@ package slice
 
 import "github.com/searKing/golib/util/object"
 
-// TakeWhileFunc returns whether any elements of this stream match the provided
+// AnyMatchFunc returns whether any elements of this stream match the provided
 // predicate.  May not evaluate the predicate on all elements if not
 // necessary for determining the result.  If the stream is empty then
 // {@code false} is returned and the predicate is not evaluated.
