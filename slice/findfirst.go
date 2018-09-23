@@ -9,10 +9,10 @@ func FindFirstFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bo
 	return anyMatchFunc(Of(s, ifStringAsRune...), f, true)
 }
 
-// firstFirstFunc is the same as FindFirstFunc.
-func firstFirstFunc(s []interface{}, f func(interface{}) bool, truth bool) interface{} {
-	object.RequireNonNil(s, "firstFirstFunc called on nil slice")
-	object.RequireNonNil(f, "firstFirstFunc called on nil callfn")
+// findFirstFunc is the same as FindFirstFunc.
+func findFirstFunc(s []interface{}, f func(interface{}) bool, truth bool) interface{} {
+	object.RequireNonNil(s, "findFirstFunc called on nil slice")
+	object.RequireNonNil(f, "findFirstFunc called on nil callfn")
 
 	for _, r := range s {
 		if f(r) == truth {
