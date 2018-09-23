@@ -165,9 +165,7 @@ func (o *Optional) Filter(predicate Predicater) *Optional {
  * @throws NullPointerException if the mapping function is {@code null}
  */
 func (o *Optional) Map(mapper func(interface{}) interface{}) *Optional {
-	if mapper == nil {
-		panic(ErrorNilPointer)
-	}
+	object.RequireNonNil(mapper)
 	if !o.IsPresent() {
 		return Empty()
 	}
@@ -195,9 +193,7 @@ func (o *Optional) Map(mapper func(interface{}) interface{}) *Optional {
  *         returns a {@code null} result
  */
 func (o *Optional) FlatMap(mapper func(interface{}) interface{}) *Optional {
-	if mapper == nil {
-		panic(ErrorNilPointer)
-	}
+	object.RequireNonNil(mapper)
 	if !o.IsPresent() {
 		return Empty()
 	}
