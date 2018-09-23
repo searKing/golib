@@ -17,10 +17,11 @@ func takeWhileFunc(s []interface{}, f func(interface{}) bool, truth bool) []inte
 
 	var sTaken = []interface{}{}
 	for _, r := range s {
-		if f(r) != true {
-			break
+		if f(r) == truth {
+			sTaken = append(sTaken, r)
+			continue
 		}
-		sTaken = append(sTaken, r)
+		break
 	}
 	return sTaken
 }
