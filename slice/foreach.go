@@ -25,8 +25,8 @@ func forEachFunc(s []interface{}, f func(interface{})) {
 	for _, r := range s {
 		wg.Add(1)
 		go func(rr interface{}) {
+			defer wg.Done()
 			f(rr)
-			wg.Done()
 		}(r)
 	}
 	wg.Wait()
