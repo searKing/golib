@@ -6,12 +6,13 @@ import (
 )
 
 // ReduceFunc calls a defined callback function on each element of an array, and returns an array that contains the results.
-func ReduceFunc(s []interface{}, f func(left, right interface{}) interface{}) interface{} {
-	return reduceFunc(s, f).Get()
+func ReduceFunc(s []interface{}, f func(left, right interface{}) interface{}, ifStringAsRune ...bool) interface{} {
+	return normalizeElem(s, reduceFunc(Of(s, ifStringAsRune...), f))
+
 }
 
 // reduceFunc is the same as ReduceFunc
-func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}, identity ...interface{}) *optional.Optional {
+func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}, identity ...interface{}) interface{} {
 	object.RequireNonNil(s, "reduceFunc called on nil slice")
 	object.RequireNonNil(s, "reduceFunc called on nil callfn")
 
@@ -31,7 +32,7 @@ func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}, id
 		}
 	}
 	if foundAny {
-		return optional.Of(result)
+		return optional.Of(result).Get()
 	}
-	return optional.Empty()
+	return optional.Empty().Get()
 }

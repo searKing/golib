@@ -4,8 +4,8 @@ import "github.com/searKing/golib/util/object"
 
 //Returns a slice consisting of the results of applying the given
 //function to the elements of this slice.
-func MapFunc(s []interface{}, f func(interface{}) interface{}) []interface{} {
-	return mapFunc(s, f)
+func MapFunc(s interface{}, f func(interface{}) interface{}, ifStringAsRune ...bool) interface{} {
+	return normalizeSlice(mapFunc(Of(s, ifStringAsRune...), f))
 }
 
 // mapFunc is the same as MapFunc

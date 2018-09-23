@@ -34,10 +34,3 @@ func of(obj interface{}, ifStringAsRune bool) []interface{} {
 	}
 	return out
 }
-
-func isAsRune(ifStringAsRune ...bool) bool {
-	if ifStringAsRune != nil && len(ifStringAsRune) > 0 && ifStringAsRune[0] {
-		return true
-	}
-	return false
-}

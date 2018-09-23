@@ -2,7 +2,6 @@ package slice
 
 import (
 	"github.com/searKing/golib/util/object"
-	"reflect"
 	"sort"
 )
 
@@ -10,25 +9,7 @@ import (
 // {@link Object#equals(Object)}) of this slice.
 // s: Accept Array、Slice、String(as []byte if ifStringAsRune else []rune)
 func SortedFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	sorted := sortedFunc(Of(s, ifStringAsRune...), f)
-	if kind := reflect.ValueOf(s).Kind(); kind != reflect.String {
-		return sorted
-	}
-
-	// AS []rune
-	if isAsRune(ifStringAsRune...) {
-		bs := make([]rune, 0, len(sorted))
-		for _, s := range sorted {
-			bs = append(bs, s.(rune))
-		}
-		return string(bs)
-	}
-	// AS []byte
-	bs := make([]byte, len(sorted))
-	for _, s := range sorted {
-		bs = append(bs, s.(byte))
-	}
-	return string(bs)
+	return normalizeSlice(sortedFunc(Of(s, ifStringAsRune...), f))
 }
 
 // sortedFunc is the same as SortedFunc except that if
