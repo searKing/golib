@@ -6,7 +6,7 @@ import (
 
 // MaxFunc returns the maximum element of this stream according to the provided.
 func MaxFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	return normalizeElem(minFunc(Of(s, ifStringAsRune...), f), s)
+	return normalizeElem(minFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
 
 }
 
