@@ -1,5 +1,7 @@
 package slice
 
+import "github.com/searKing/golib/util/optional"
+
 type Stream struct {
 	s              interface{}
 	ifStringAsRune bool
@@ -74,16 +76,16 @@ func (stream *Stream) ToSlice(ifStringAsRune ...bool) interface{} {
 	return ToSliceFunc(stream.s, stream.ifStringAsRune)
 }
 
-func (stream *Stream) Reduce(f func(left, right interface{}) interface{}) interface{} {
-	return ReduceFunc(stream.s, f, stream.ifStringAsRune)
+func (stream *Stream) Reduce(f func(left, right interface{}) interface{}) *optional.Optional {
+	return optional.OfNillable(ReduceFunc(stream.s, f, stream.ifStringAsRune))
 }
 
-func (stream *Stream) Min(f func(interface{}, interface{}) int) interface{} {
-	return MinFunc(stream.s, f, stream.ifStringAsRune)
+func (stream *Stream) Min(f func(interface{}, interface{}) int) *optional.Optional {
+	return optional.OfNillable(MinFunc(stream.s, f, stream.ifStringAsRune))
 }
 
-func (stream *Stream) Max(f func(interface{}, interface{}) int) interface{} {
-	return MaxFunc(stream.s, f, stream.ifStringAsRune)
+func (stream *Stream) Max(f func(interface{}, interface{}) int) *optional.Optional {
+	return optional.OfNillable(MaxFunc(stream.s, f, stream.ifStringAsRune))
 }
 
 func (stream *Stream) Count(ifStringAsRune ...bool) int {
@@ -102,12 +104,20 @@ func (stream *Stream) NoneMatch(f func(interface{}) bool) bool {
 	return NoneMatchFunc(stream.s, f, stream.ifStringAsRune)
 }
 
-func (stream *Stream) FindFirst(f func(interface{}) bool) interface{} {
-	return FindFirstFunc(stream.s, f, stream.ifStringAsRune)
+func (stream *Stream) FindFirst(f func(interface{}) bool) *optional.Optional {
+	return optional.OfNillable(FindFirstFunc(stream.s, f, stream.ifStringAsRune))
 }
 
-func (stream *Stream) FindAny(f func(interface{}) bool) interface{} {
-	return FindAnyFunc(stream.s, f, stream.ifStringAsRune)
+func (stream *Stream) FindFirstIndex(f func(interface{}) bool) int {
+	return FindFirstIndexFunc(stream.s, f, stream.ifStringAsRune)
+}
+
+func (stream *Stream) FindAny(f func(interface{}) bool) *optional.Optional {
+	return optional.OfNillable(FindAnyFunc(stream.s, f, stream.ifStringAsRune))
+}
+
+func (stream *Stream) FindAnyIndex(f func(interface{}) bool) int {
+	return FindAnyIndexFunc(stream.s, f, stream.ifStringAsRune)
 }
 
 func (stream *Stream) Empty(ifStringAsRune ...bool) interface{} {

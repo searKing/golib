@@ -9,21 +9,29 @@ var empty = &Optional{}
 var (
 	ErrorNoValuePresent = errors.New("No value present")
 )
-
+// Optional is a container object which may or may not contain a non-{@code null} value.
+// If a value is present, {@code isPresent()} returns {@code true}. If no
+// value is present, the object is considered <i>empty</i> and
+// {@code isPresent()} returns {@code false}.
 type Optional struct {
 	value interface{}
 }
 
+// Empty returns an empty {@code Optional} instance.  No value is present for this
+// {@code Optional}.
 func Empty() *Optional {
 	return empty
 }
 
+// Of Returns an {@code Optional} describing the given value.
 func Of(value interface{}) *Optional {
 	return &Optional{
 		value: value,
 	}
 }
 
+// Of Returns an {@code Optional} describing the given value, if
+// non-{@code null}, otherwise returns an empty {@code Optional}.
 func OfNillable(value interface{}) *Optional {
 	if value == nil {
 		return Empty()
@@ -31,27 +39,16 @@ func OfNillable(value interface{}) *Optional {
 	return Of(value)
 }
 
-/**
- * If a value is present, returns the value, otherwise throws
- * {@code ErrorNoValuePresent}.
- *
- * @apiNote
- * The preferred alternative to this method is {@link #orElseThrow()}.
- *
- * @return the non-{@code null} value described by this {@code Optional}
- * @throws ErrorNoValuePresent if no value is present
- */
+// Get returns the value if a value is present, otherwise throws
+// {@code ErrorNoValuePresent}.
 func (o *Optional) Get() interface{} {
 	object.RequireNonNil(o.value)
 	return o.value
 }
 
-/**
- * If a value is present, returns {@code true}, otherwise {@code false}.
- *
- * @return {@code true} if a value is present, otherwise {@code false}
- */
+// IsPresent returns {@code true} if a value is present, otherwise {@code false}.
 func (o *Optional) IsPresent() bool {
+	object.RequireNonNil(o)
 	return o.value != nil
 }
 
