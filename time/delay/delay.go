@@ -37,6 +37,20 @@ func (d *Delay) Update() {
 		d.delay = max
 	}
 }
+
+func (d *Delay) Sleep() {
+	d.Update()
+	time.Sleep(d.delay)
+}
+
+func (d *Delay) Delay() <-chan time.Time {
+	d.Update()
+	return time.After(d.delay)
+}
+func (d *Delay) DelayFunc(f func()) *time.Timer {
+	d.Update()
+	return time.AfterFunc(d.delay, f)
+}
 func (d *Delay) Reset() {
 	d.delay = ZeroDuration
 }
