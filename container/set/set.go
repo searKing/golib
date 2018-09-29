@@ -6,13 +6,11 @@ import (
 )
 
 // take advantage of map
-type (
-	Set struct {
-		eles map[interface{}]struct{}
-	}
-)
+type Set struct {
+	eles map[interface{}]struct{}
+}
 
-// Create a new stack
+// Create a new set
 func New() *Set {
 	return &Set{}
 }
