@@ -13,7 +13,7 @@ func PeekFunc(s interface{}, f func(interface{}), ifStringAsRune ...bool) interf
 // peekFunc is the same as PeekFunc.
 func peekFunc(s []interface{}, f func(interface{})) []interface{} {
 	object.RequireNonNil(s, "peekFunc called on nil slice")
-	object.RequireNonNil(s, "peekFunc called on nil callfn")
+	object.RequireNonNil(f, "peekFunc called on nil callfn")
 
 	for _, r := range s {
 		f(r)

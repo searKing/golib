@@ -13,7 +13,7 @@ func MinFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune
 // minFunc is the same as MinFunc
 func minFunc(s []interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
 	object.RequireNonNil(s, "minFunc called on nil slice")
-	object.RequireNonNil(s, "minFunc called on nil callfn")
+	object.RequireNonNil(f, "minFunc called on nil callfn")
 
 	return ReduceFunc(s, func(left, right interface{}) interface{} {
 		if f(left, right) < 0 {

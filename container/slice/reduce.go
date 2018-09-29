@@ -13,7 +13,7 @@ func ReduceFunc(s interface{}, f func(left, right interface{}) interface{}, ifSt
 // reduceFunc is the same as ReduceFunc
 func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}, identity ...interface{}) interface{} {
 	object.RequireNonNil(s, "reduceFunc called on nil slice")
-	object.RequireNonNil(s, "reduceFunc called on nil callfn")
+	object.RequireNonNil(f, "reduceFunc called on nil callfn")
 
 	var foundAny bool
 	var result interface{}

@@ -13,7 +13,7 @@ func DistinctFunc(s interface{}, f func(interface{}, interface{}) int, ifStringA
 //// inverted.
 func distinctFunc(s []interface{}, f func(interface{}, interface{}) int) []interface{} {
 	object.RequireNonNil(s, "distinctFunc called on nil slice")
-	object.RequireNonNil(s, "distinctFunc called on nil callfn")
+	object.RequireNonNil(f, "distinctFunc called on nil callfn")
 
 	sDistinctMap := map[interface{}]struct{}{}
 	var sDistincted = []interface{}{}

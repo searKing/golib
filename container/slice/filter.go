@@ -14,7 +14,7 @@ func FilterFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool)
 // inverted.
 func filterFunc(s []interface{}, f func(interface{}) bool, truth bool) []interface{} {
 	object.RequireNonNil(s, "filterFunc called on nil slice")
-	object.RequireNonNil(s, "filterFunc called on nil callfn")
+	object.RequireNonNil(f, "filterFunc called on nil callfn")
 
 	var sFiltered = []interface{}{}
 	for _, r := range s {

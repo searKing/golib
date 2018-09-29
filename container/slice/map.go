@@ -11,7 +11,7 @@ func MapFunc(s interface{}, f func(interface{}) interface{}, ifStringAsRune ...b
 // mapFunc is the same as MapFunc
 func mapFunc(s []interface{}, f func(interface{}) interface{}) []interface{} {
 	object.RequireNonNil(s, "mapFunc called on nil slice")
-	object.RequireNonNil(s, "mapFunc called on nil callfn")
+	object.RequireNonNil(f, "mapFunc called on nil callfn")
 
 	var sMapped = []interface{}{}
 	for _, r := range s {

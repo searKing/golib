@@ -14,7 +14,7 @@ func ForEachOrderedFunc(s interface{}, f func(interface{}), ifStringAsRune ...bo
 // forEachOrderedFunc is the same as ForEachOrderedFunc
 func forEachOrderedFunc(s []interface{}, f func(interface{})) {
 	object.RequireNonNil(s, "forEachOrderedFunc called on nil slice")
-	object.RequireNonNil(s, "forEachOrderedFunc called on nil callfn")
+	object.RequireNonNil(f, "forEachOrderedFunc called on nil callfn")
 
 	for _, r := range s {
 		f(r)

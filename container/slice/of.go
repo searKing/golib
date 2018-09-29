@@ -19,7 +19,9 @@ type MapPair struct {
 func of(obj interface{}, ifStringAsRune bool) []interface{} {
 	switch kind := reflect.ValueOf(obj).Kind(); kind {
 	default:
-		panic(&reflect.ValueError{"reflect.Value.Slice", kind})
+		// element as a slice of one element
+		out := []interface{}{}
+		out = append(out, obj)
 	case reflect.Array, reflect.Slice:
 	case reflect.String:
 		if ifStringAsRune {

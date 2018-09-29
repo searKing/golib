@@ -20,7 +20,7 @@ func ForEachFunc(s interface{}, f func(interface{}), ifStringAsRune ...bool) {
 // forEachFunc is the same as ForEachFunc
 func forEachFunc(s []interface{}, f func(interface{})) {
 	object.RequireNonNil(s, "forEachFunc called on nil slice")
-	object.RequireNonNil(s, "forEachFunc called on nil callfn")
+	object.RequireNonNil(f, "forEachFunc called on nil callfn")
 	var wg sync.WaitGroup
 	for _, r := range s {
 		wg.Add(1)

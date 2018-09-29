@@ -13,7 +13,7 @@ func MaxFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune
 // maxFunc is the same as MaxFunc
 func maxFunc(s []interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
 	object.RequireNonNil(s, "maxFunc called on nil slice")
-	object.RequireNonNil(s, "maxFunc called on nil callfn")
+	object.RequireNonNil(f, "maxFunc called on nil callfn")
 
 	return ReduceFunc(s, func(left, right interface{}) interface{} {
 		if f(left, right) > 0 {
