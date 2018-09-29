@@ -30,8 +30,8 @@ func (s *Set) lazyInit() *Set {
 	return s
 }
 
-// Size returns the number of elements in this set (its cardinality).
-func (s *Set) Size() int {
+// Count returns the number of elements in this set (its cardinality).
+func (s *Set) Count() int {
 	if s.eles == nil {
 		return 0
 	}
@@ -40,7 +40,7 @@ func (s *Set) Size() int {
 
 // IsEmpty returns {@code true} if this set contains no elements.
 func (s *Set) IsEmpty() bool {
-	if s.Size() == 0 {
+	if s.Count() == 0 {
 		return true
 	}
 	return false
@@ -59,7 +59,7 @@ func (s *Set) Contains(e interface{}) bool {
 
 // ToSLice returns a slice containing all of the elements in this set.
 func (s *Set) ToSlice() []interface{} {
-	es := make([]interface{}, 0, s.Size())
+	es := make([]interface{}, 0, s.Count())
 	if s.IsEmpty() {
 		return es
 	}
@@ -142,10 +142,12 @@ func (s *Set) RetainAll(stream *slice.Stream) *Set {
 		return s
 	}
 	// stream is too big
-	s.RemoveAll(stream.Filter(func(e interface{}) bool {
+	retained := stream.Filter(func(e interface{}) bool {
 		_, ok := s.eles[e]
 		return ok
-	}))
+	})
+	s.Clear()
+	s.AddAll(retained)
 	return s
 }
 
@@ -190,7 +192,7 @@ func (s *Set) Equals(other *Set) bool {
 		return false
 	}
 
-	if s.Size() != other.Size() {
+	if s.Count() != other.Count() {
 		return false
 	}
 	for k, _ := range s.eles {
@@ -206,6 +208,10 @@ func (s *Set) Clone() *Set {
 	return (object.DeepClone(s)).(*Set)
 }
 
+func (s *Set) ToStream() *slice.Stream {
+	return slice.NewStream().WithSlice(s.ToSlice())
+}
+
 // Of returns an unmodifiable set containing the input element(s).
 func Of(es ...interface{}) *Set {
 	s := New()
@@ -214,4 +220,13 @@ func Of(es ...interface{}) *Set {
 			s.Add(e)
 		})
 	return s
+}
+
+//grammar surger for count
+func (s *Set) Size() int {
+	return s.Count()
+}
+
+func (s *Set) Length() int {
+	return s.Count()
 }

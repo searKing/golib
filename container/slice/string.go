@@ -18,7 +18,7 @@ func normalizeSliceAsMap(s []interface{}) interface{} {
 	bs := make(map[interface{}]interface{})
 	for _, m := range s {
 		pair := m.(MapPair)
-		bs[pair.key] = pair.value
+		bs[pair.Key] = pair.Value
 	}
 	return bs
 }

@@ -11,8 +11,8 @@ func Of(obj interface{}) []interface{} {
 }
 
 type MapPair struct {
-	key   interface{}
-	value interface{}
+	Key   interface{}
+	Value interface{}
 }
 
 //of is the same as Of
@@ -30,8 +30,8 @@ func of(obj interface{}) []interface{} {
 		for _, k := range keys {
 			e := v.MapIndex(k)
 			pair := MapPair{
-				key:   k.Elem().Interface(),
-				value: e.Elem().Interface(),
+				Key:   reflect.Indirect(k).Interface(),
+				Value: reflect.Indirect(e).Interface(),
 			}
 			out = append(out, pair)
 		}
