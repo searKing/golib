@@ -1,6 +1,9 @@
 package boolean
 
-import "github.com/searKing/golib/util/object"
+import (
+	"github.com/searKing/golib/container/slice"
+	"github.com/searKing/golib/util/object"
+)
 
 // https://en.wikipedia.org/wiki/Boolean_operation
 
@@ -17,7 +20,18 @@ func and(a, b bool) bool {
 	return a && b
 }
 
+func RelationFunc(a, b interface{}, f func(a, b interface{}) interface{}, c ...interface{}) interface{} {
+	object.RequireNonNil(f)
+	if c == nil || len(c) == 0 {
+		return f(a, b)
+	}
+	return RelationFunc(f(a, b), c[0], f, c[1:]...)
+}
 func BoolFunc(a bool, b bool, f func(a, b bool) bool, c ...bool) bool {
+
+	return RelationFunc(a, b, func(a, b interface{}) interface{} {
+		return f(a.(bool), b.(bool))
+	}, slice.Of(c)...).(bool)
 	object.RequireNonNil(f)
 	if c == nil || len(c) == 0 {
 		return f(a, b)
