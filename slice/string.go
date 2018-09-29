@@ -10,12 +10,32 @@ func isAsRune(ifStringAsRune ...bool) bool {
 }
 
 func normalizeSlice(s []interface{}, as interface{}, ifStringAsRune ...bool) interface{} {
+	kind := reflect.ValueOf(as).Kind()
+	switch kind {
+	case reflect.Map:
+		return normalizeSliceAsMap(s)
+	case reflect.String:
+		return normalizeSliceAsString(s, isAsRune(ifStringAsRune...))
+
+	}
+	return s
+}
+func normalizeElem(elem, as interface{}, ifStringAsRune ...bool) interface{} {
 	if kind := reflect.ValueOf(as).Kind(); kind != reflect.String {
-		return s
+		return elem
 	}
 
-	// AS []rune
+	// AS rune
 	if isAsRune(ifStringAsRune...) {
+		return string([]rune{elem.(rune)})
+	}
+	// AS byte
+	return string([]byte{elem.(byte)})
+}
+
+func normalizeSliceAsString(s []interface{}, asRune bool) interface{} {
+	// AS []rune
+	if asRune {
 		bs := make([]rune, 0, len(s))
 		for _, s := range s {
 			bs = append(bs, s.(rune))
@@ -29,15 +49,12 @@ func normalizeSlice(s []interface{}, as interface{}, ifStringAsRune ...bool) int
 	}
 	return string(bs)
 }
-func normalizeElem(elem, as interface{}, ifStringAsRune ...bool) interface{} {
-	if kind := reflect.ValueOf(as).Kind(); kind != reflect.String {
-		return elem
-	}
 
-	// AS rune
-	if isAsRune(ifStringAsRune...) {
-		return string([]rune{elem.(rune)})
+func normalizeSliceAsMap(s []interface{}) interface{} {
+	bs := make(map[interface{}]interface{})
+	for _, m := range s {
+		pair := m.(MapPair)
+		bs[pair.key] = pair.value
 	}
-	// AS byte
-	return string([]byte{elem.(byte)})
+	return bs
 }

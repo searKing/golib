@@ -10,6 +10,11 @@ func Of(obj interface{}, ifStringAsRune ...bool) []interface{} {
 	return of(obj, isAsRune(ifStringAsRune...))
 }
 
+type MapPair struct {
+	key   interface{}
+	value interface{}
+}
+
 //of is the same as Of
 func of(obj interface{}, ifStringAsRune bool) []interface{} {
 	switch kind := reflect.ValueOf(obj).Kind(); kind {
@@ -25,6 +30,19 @@ func of(obj interface{}, ifStringAsRune bool) []interface{} {
 			}
 			return out
 		}
+	case reflect.Map:
+		out := []interface{}{}
+		v := reflect.ValueOf(obj)
+		keys := v.MapKeys()
+		for _, k := range keys {
+			e := v.MapIndex(k)
+			pair := MapPair{
+				key:   k.Elem().Interface(),
+				value: e.Elem().Interface(),
+			}
+			out = append(out, pair)
+		}
+		return out
 	}
 
 	out := []interface{}{}
