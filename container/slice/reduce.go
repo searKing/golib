@@ -6,8 +6,8 @@ import (
 )
 
 // ReduceFunc calls a defined callback function on each element of an array, and returns an array that contains the results.
-func ReduceFunc(s interface{}, f func(left, right interface{}) interface{}, ifStringAsRune ...bool) interface{} {
-	return normalizeElem(reduceFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
+func ReduceFunc(s interface{}, f func(left, right interface{}) interface{}) interface{} {
+	return normalizeElem(reduceFunc(Of(s), f), s)
 }
 
 // reduceFunc is the same as ReduceFunc

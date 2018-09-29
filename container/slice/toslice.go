@@ -1,8 +1,8 @@
 package slice
 
 // ToSliceFunc returns an array containing the elements of this stream.
-func ToSliceFunc(s interface{}, ifStringAsRune ...bool) interface{} {
-	return toSliceFunc(Of(s, ifStringAsRune...))
+func ToSliceFunc(s interface{}) interface{} {
+	return toSliceFunc(Of(s))
 }
 
 // toSliceFunc is the same as ToSliceFunc

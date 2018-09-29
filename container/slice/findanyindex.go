@@ -7,8 +7,8 @@ import (
 
 // FindAnyFunc returns an {@link interface{}} describing some element of the stream, or an
 // empty {@code Optional} if the stream is empty.
-func FindAnyIndexFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) int {
-	return findAnyIndexFunc(Of(s, ifStringAsRune...), f, true)
+func FindAnyIndexFunc(s interface{}, f func(interface{}) bool) int {
+	return findAnyIndexFunc(Of(s), f, true)
 }
 
 // findAnyFunc is the same as FindAnyFunc.

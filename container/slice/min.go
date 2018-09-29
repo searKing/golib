@@ -5,13 +5,13 @@ import (
 )
 
 // MinFunc returns the minimum element of this stream according to the provided.
-func MinFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	return normalizeElem(minFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
+func MinFunc(s interface{}, f func(interface{}, interface{}) int) interface{} {
+	return normalizeElem(minFunc(Of(s), f), s)
 
 }
 
 // minFunc is the same as MinFunc
-func minFunc(s []interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
+func minFunc(s []interface{}, f func(interface{}, interface{}) int) interface{} {
 	object.RequireNonNil(s, "minFunc called on nil slice")
 	object.RequireNonNil(f, "minFunc called on nil callfn")
 
@@ -20,5 +20,5 @@ func minFunc(s []interface{}, f func(interface{}, interface{}) int, ifStringAsRu
 			return left
 		}
 		return right
-	}, ifStringAsRune...)
+	})
 }

@@ -6,8 +6,8 @@ import "github.com/searKing/golib/util/object"
 // prefix of elements taken from this slice that match the given predicate.
 // Otherwise returns, if this slice is unordered, a slice consisting of a
 // subset of elements taken from this slice that match the given predicate.
-func TakeWhileFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(takeWhileFunc(Of(s, ifStringAsRune...), f, true), s, ifStringAsRune...)
+func TakeWhileFunc(s interface{}, f func(interface{}) bool) interface{} {
+	return normalizeSlice(takeWhileFunc(Of(s), f, true), s)
 }
 
 // takeWhileFunc is the same as TakeWhileFunc.

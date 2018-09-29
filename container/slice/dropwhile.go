@@ -7,8 +7,8 @@ import "github.com/searKing/golib/util/object"
 // that match the given predicate.  Otherwise returns, if this slice is
 // unordered, a slice consisting of the remaining elements of this slice
 // after dropping a subset of elements that match the given predicate.
-func DropWhileFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(dropWhileFunc(Of(s, ifStringAsRune...), f, true), s, ifStringAsRune...)
+func DropWhileFunc(s interface{}, f func(interface{}) bool) interface{} {
+	return normalizeSlice(dropWhileFunc(Of(s), f, true), s)
 }
 
 // dropWhileFunc is the same as DropWhileFunc.

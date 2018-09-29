@@ -5,8 +5,8 @@ import (
 )
 
 // CountFunc returns the maximum element of this stream according to the provided.
-func CountFunc(s interface{}, ifStringAsRune ...bool) int {
-	return countFunc(Of(s, ifStringAsRune...))
+func CountFunc(s interface{}) int {
+	return countFunc(Of(s))
 
 }
 

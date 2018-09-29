@@ -2,8 +2,8 @@ package slice
 
 // FindAnyFunc returns an {@link Optional} describing some element of the stream, or an
 // empty {@code Optional} if the stream is empty.
-func FindAnyFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) interface{} {
-	return normalizeElem(findAnyFunc(Of(s, ifStringAsRune...), f, true), s, ifStringAsRune...)
+func FindAnyFunc(s interface{}, f func(interface{}) bool) interface{} {
+	return normalizeElem(findAnyFunc(Of(s), f, true), s)
 }
 
 // findAnyFunc is the same as FindAnyFunc.

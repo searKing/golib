@@ -13,8 +13,8 @@ import (
 // action may be performed at whatever time and in whatever thread the
 // library chooses.  If the action accesses shared state, it is
 // responsible for providing the required synchronization.
-func ForEachFunc(s interface{}, f func(interface{}), ifStringAsRune ...bool) {
-	forEachFunc(Of(s, ifStringAsRune...), f)
+func ForEachFunc(s interface{}, f func(interface{})) {
+	forEachFunc(Of(s), f)
 }
 
 // forEachFunc is the same as ForEachFunc

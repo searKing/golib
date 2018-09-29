@@ -5,13 +5,13 @@ import (
 )
 
 // MaxFunc returns the maximum element of this stream according to the provided.
-func MaxFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	return normalizeElem(minFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
+func MaxFunc(s interface{}, f func(interface{}, interface{}) int) interface{} {
+	return normalizeElem(minFunc(Of(s), f), s)
 
 }
 
 // maxFunc is the same as MaxFunc
-func maxFunc(s []interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
+func maxFunc(s []interface{}, f func(interface{}, interface{}) int) interface{} {
 	object.RequireNonNil(s, "maxFunc called on nil slice")
 	object.RequireNonNil(f, "maxFunc called on nil callfn")
 
@@ -20,5 +20,5 @@ func maxFunc(s []interface{}, f func(interface{}, interface{}) int, ifStringAsRu
 			return left
 		}
 		return right
-	}, ifStringAsRune...)
+	})
 }

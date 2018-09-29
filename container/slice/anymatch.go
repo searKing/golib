@@ -6,8 +6,8 @@ import "github.com/searKing/golib/util/object"
 // predicate.  May not evaluate the predicate on all elements if not
 // necessary for determining the result.  If the stream is empty then
 // {@code false} is returned and the predicate is not evaluated.
-func AnyMatchFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) bool {
-	return anyMatchFunc(Of(s, ifStringAsRune...), f, true)
+func AnyMatchFunc(s interface{}, f func(interface{}) bool) bool {
+	return anyMatchFunc(Of(s), f, true)
 }
 
 // anyMatchFunc is the same as AnyMatchFunc.

@@ -7,8 +7,8 @@ import "github.com/searKing/golib/util/object"
 // order if one exists.  Performing the action for one element
 // performing the action for subsequent elements, but for any given element,
 // the action may be performed in whatever thread the library chooses.
-func ForEachOrderedFunc(s interface{}, f func(interface{}), ifStringAsRune ...bool) {
-	forEachOrderedFunc(Of(s, ifStringAsRune...), f)
+func ForEachOrderedFunc(s interface{}, f func(interface{})) {
+	forEachOrderedFunc(Of(s), f)
 }
 
 // forEachOrderedFunc is the same as ForEachOrderedFunc

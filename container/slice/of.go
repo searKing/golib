@@ -6,8 +6,8 @@ import (
 
 // Of returns a slice consisting of the elements.
 // obj: Accept Array、Slice、String(as []byte if ifStringAsRune else []rune)
-func Of(obj interface{}, ifStringAsRune ...bool) []interface{} {
-	return of(obj, isAsRune(ifStringAsRune...))
+func Of(obj interface{}) []interface{} {
+	return of(obj)
 }
 
 type MapPair struct {
@@ -16,22 +16,13 @@ type MapPair struct {
 }
 
 //of is the same as Of
-func of(obj interface{}, ifStringAsRune bool) []interface{} {
+func of(obj interface{}) []interface{} {
 	switch kind := reflect.ValueOf(obj).Kind(); kind {
 	default:
 		// element as a slice of one element
 		out := []interface{}{}
 		out = append(out, obj)
 	case reflect.Array, reflect.Slice:
-	case reflect.String:
-		if ifStringAsRune {
-			out := []interface{}{}
-			in := obj.(string)
-			for _, r := range in {
-				out = append(out, r)
-			}
-			return out
-		}
 	case reflect.Map:
 		out := []interface{}{}
 		v := reflect.ValueOf(obj)

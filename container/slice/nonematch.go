@@ -4,8 +4,8 @@ package slice
 // May not evaluate the predicate on all elements if not necessary for
 // determining the result.  If the stream is empty then {@code true} is
 // returned and the predicate is not evaluated.
-func NoneMatchFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) bool {
-	return noneMatchFunc(Of(s, ifStringAsRune...), f, true)
+func NoneMatchFunc(s interface{}, f func(interface{}) bool) bool {
+	return noneMatchFunc(Of(s), f, true)
 }
 
 // noneMatchFunc is the same as NoneMatchFunc.

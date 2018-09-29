@@ -8,8 +8,8 @@ import (
 // SortedFunc returns a slice consisting of the distinct elements (according to
 // {@link Object#equals(Object)}) of this slice.
 // s: Accept Array、Slice、String(as []byte if ifStringAsRune else []rune)
-func SortedFunc(s interface{}, f func(interface{}, interface{}) int, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(sortedFunc(Of(s, ifStringAsRune...), f), s, ifStringAsRune...)
+func SortedFunc(s interface{}, f func(interface{}, interface{}) int) interface{} {
+	return normalizeSlice(sortedFunc(Of(s), f), s)
 }
 
 // sortedFunc is the same as SortedFunc except that if

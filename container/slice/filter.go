@@ -4,9 +4,8 @@ import "github.com/searKing/golib/util/object"
 
 // FilterFunc returns a slice consisting of the elements of this slice that match
 // the given predicate.
-func FilterFunc(s interface{}, f func(interface{}) bool, ifStringAsRune ...bool) interface{} {
-	return normalizeSlice(filterFunc(Of(s, ifStringAsRune...), f, true), s, ifStringAsRune...)
-
+func FilterFunc(s interface{}, f func(interface{}) bool) interface{} {
+	return normalizeSlice(filterFunc(Of(s), f, true), s)
 }
 
 // filterFunc is the same as FilterFunc except that if
