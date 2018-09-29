@@ -18,16 +18,16 @@ func reduceFunc(s []interface{}, f func(left, right interface{}) interface{}, id
 	var foundAny bool
 	var result interface{}
 
-	if (identity != nil || len(identity) != 0) {
-		foundAny = true;
-		result = identity;
+	if identity != nil || len(identity) != 0 {
+		foundAny = true
+		result = identity
 	}
 	for _, r := range s {
-		if (!foundAny) {
-			foundAny = true;
-			result = r;
+		if !foundAny {
+			foundAny = true
+			result = r
 		} else {
-			result = f(result, r);
+			result = f(result, r)
 		}
 	}
 	if foundAny {

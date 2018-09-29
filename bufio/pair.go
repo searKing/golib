@@ -3,8 +3,8 @@ package bufio
 import (
 	"bytes"
 	"github.com/pkg/errors"
+	"github.com/searKing/golib/container/slice"
 	"github.com/searKing/golib/container/stack"
-	"github.com/searKing/golib/slice"
 	"io"
 )
 
