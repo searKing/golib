@@ -43,7 +43,7 @@ func XOR(a bool, b bool, c ...bool) bool {
 	return BoolFunc(a, b, xor, c...)
 }
 func XNOR(a bool, b bool, c ...bool) bool {
-	return !XOR(a, b, c...)
+	return BoolFunc(a, b, xnor, c...)
 }
 
 func OR(a bool, b bool, c ...bool) bool {
