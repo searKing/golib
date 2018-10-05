@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"github.com/searKing/golib/time/delay"
+	"github.com/searKing/golib/util/object"
 	"go.uber.org/atomic"
 	"log"
 	"net"
@@ -28,6 +29,15 @@ type HandleMsgHandlerFunc func(b *bufio.Writer, msg interface{}) error
 func (f HandleMsgHandlerFunc) HandleMsg(b *bufio.Writer, msg interface{}) error {
 	return f(b, msg)
 }
+func NewServer(readMsgHandler ReadMsgHandler, handleMsgHandler HandleMsgHandler) *Server {
+	return &Server{
+		ReadMsgHandler:   object.RequireNonNullElse(readMsgHandler, NopReadMsgHandler).(ReadMsgHandler),
+		HandleMsgHandler: object.RequireNonNullElse(handleMsgHandler, NopMsgHandlerFunc).(HandleMsgHandler),
+	}
+}
+
+var NopReadMsgHandler = ReadMsgHandlerFunc(func(b *bufio.Reader) (msg interface{}, err error) { return nil, nil })
+var NopMsgHandlerFunc = HandleMsgHandlerFunc(func(b *bufio.Writer, msg interface{}) error { return nil })
 
 type Server struct {
 	Addr             string // TCP address to listen on, ":tcp" if empty
@@ -48,8 +58,7 @@ type Server struct {
 	onShutdown []func()
 
 	// server state
-	disableKeepAlives atomic.Bool // accessed atomically.
-	inShutdown        atomic.Bool
+	inShutdown atomic.Bool
 
 	// ConnState specifies an optional callback function that is
 	// called when a client connection changes state. See the
@@ -103,6 +112,19 @@ func (srv *Server) Serve(l net.Listener) error {
 		c := srv.newConn(rw)
 		c.setState(c.rwc, StateNew) // before Serve can return
 		go c.serve(ctx)
+	}
+}
+
+func (s *Server) trackConn(c *conn, add bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.activeConn == nil {
+		s.activeConn = make(map[*conn]struct{})
+	}
+	if add {
+		s.activeConn[c] = struct{}{}
+	} else {
+		delete(s.activeConn, c)
 	}
 }
 

@@ -1,4 +1,4 @@
-package tcp
+package websocket
 
 import "time"
 
@@ -28,28 +28,4 @@ func (s *Server) readTimeout() time.Duration {
 
 func (s *Server) shuttingDown() bool {
 	return s.inShutdown.Load()
-}
-func (s *Server) getDoneChan() <-chan struct{} {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.getDoneChanLocked()
-}
-
-func (s *Server) getDoneChanLocked() chan struct{} {
-	if s.doneChan == nil {
-		s.doneChan = make(chan struct{})
-	}
-	return s.doneChan
-}
-
-func (s *Server) closeDoneChanLocked() {
-	ch := s.getDoneChanLocked()
-	select {
-	case <-ch:
-		// Already closed. Don't close again.
-	default:
-		// Safe to close here. We're the only closer, guarded
-		// by s.mu.
-		close(ch)
-	}
 }
