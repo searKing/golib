@@ -17,7 +17,7 @@ type ServerHandler interface {
 	HandleMsgHandler
 }
 type HTTPHandler interface {
-	ServeHTTP(http.ResponseWriter, *http.Request) error
+	HandleHTTP(http.ResponseWriter, *http.Request) error
 }
 type HTTPHandlerFunc func(http.ResponseWriter, *http.Request) error
 
@@ -84,7 +84,7 @@ type Server struct {
 	ConnState func(*WebSocketConn, ConnState)
 }
 
-// ServeHTTP takes over the http handler
+// HandleHTTP takes over the http handler
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	if srv.shuttingDown() {
 		return ErrServerClosed
@@ -98,7 +98,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	defer ws.Close()
 	ctx := context.WithValue(context.Background(), ServerContextKey, srv)
 	// Handle HTTP Handshake
-	err = srv.HTTPHandler.ServeHTTP(w, r)
+	err = srv.HTTPHandler.HandleHTTP(w, r)
 	if err != nil {
 		return err
 	}
