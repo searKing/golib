@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+type ServerHandler interface {
+	ReadMsgHandler
+	HandleMsgHandler
+}
 type ReadMsgHandler interface {
 	ReadMsg(b *bufio.Reader) (msg interface{}, err error)
 }
@@ -29,11 +33,14 @@ type HandleMsgHandlerFunc func(b *bufio.Writer, msg interface{}) error
 func (f HandleMsgHandlerFunc) HandleMsg(b *bufio.Writer, msg interface{}) error {
 	return f(b, msg)
 }
-func NewServer(readMsgHandler ReadMsgHandler, handleMsgHandler HandleMsgHandler) *Server {
+func NewServerFunc(readMsgHandler ReadMsgHandler, handleMsgHandler HandleMsgHandler) *Server {
 	return &Server{
 		ReadMsgHandler:   object.RequireNonNullElse(readMsgHandler, NopReadMsgHandler).(ReadMsgHandler),
 		HandleMsgHandler: object.RequireNonNullElse(handleMsgHandler, NopMsgHandlerFunc).(HandleMsgHandler),
 	}
+}
+func NewServer(h ServerHandler) *Server {
+	return NewServerFunc(h, h)
 }
 
 var NopReadMsgHandler = ReadMsgHandlerFunc(func(b *bufio.Reader) (msg interface{}, err error) { return nil, nil })
