@@ -27,6 +27,8 @@ func (c *WebSocketConn) ReadMessage() (messageType int, p []byte, err error) {
 	return c.Conn.ReadMessage()
 }
 func (c *WebSocketConn) WriteJSON(v interface{}) error {
+	c.muWrite.Lock()
+	defer c.muWrite.Unlock()
 	return c.Conn.WriteJSON(v)
 }
 func (c *WebSocketConn) Close() error {
