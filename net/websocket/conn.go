@@ -27,7 +27,7 @@ type conn struct {
 	// This is never wrapped by other types and is the value given out
 	// to CloseNotifier callers. It is usually of type *net.TCPConn or
 	// *tls.Conn.
-	rwc *websocket.Conn
+	rwc *WebSocketConn
 
 	// remoteAddr is rwc.RemoteAddr().String(). It is not populated synchronously
 	// inside the Listener's Accept goroutine, as some implementations block.
@@ -47,7 +47,7 @@ func (c *conn) close() {
 	c.rwc.Close()
 }
 
-func (c *conn) setState(nc *websocket.Conn, state ConnState) {
+func (c *conn) setState(nc *WebSocketConn, state ConnState) {
 	srv := c.server
 	if state > 0xff || state < 0 {
 		panic("internal error")

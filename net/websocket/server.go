@@ -81,7 +81,7 @@ type Server struct {
 	// ConnState specifies an optional callback function that is
 	// called when a client connection changes state. See the
 	// ConnState type and associated constants for details.
-	ConnState func(*websocket.Conn, ConnState)
+	ConnState func(*WebSocketConn, ConnState)
 }
 
 // ServeHTTP takes over the http handler
@@ -110,10 +110,12 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 }
 
 // Create new connection from rwc.
-func (srv *Server) newConn(rwc *websocket.Conn) *conn {
+func (srv *Server) newConn(wc *websocket.Conn) *conn {
 	c := &conn{
 		server: srv,
-		rwc:    rwc,
+		rwc: &WebSocketConn{
+			Conn: wc,
+		},
 	}
 	return c
 }
