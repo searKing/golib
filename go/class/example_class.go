@@ -1,6 +1,5 @@
 package class
 
-
 func ExampleClass() {
 
 }

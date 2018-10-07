@@ -12,7 +12,7 @@ const HumanBasePower = 3
 
 //power
 const (
-	One           Unit = 3 * iota
+	One Unit = 3 * iota
 	Kilo
 	Mega
 	Giga

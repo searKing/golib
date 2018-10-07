@@ -1,10 +1,10 @@
 package addr
 
 import (
-	"net"
-	"time"
 	"fmt"
+	"net"
 	"strings"
+	"time"
 )
 
 // http://:80

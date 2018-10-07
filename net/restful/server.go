@@ -1,11 +1,11 @@
 package restful
 
 import (
-	"net/http"
 	"encoding/json"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 	"strings"
-	"io/ioutil"
 )
 
 func HttpGetHandler(v interface{}, w http.ResponseWriter, r *http.Request) {

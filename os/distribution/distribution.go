@@ -1,8 +1,8 @@
 package distribution
 
 import (
-	"runtime"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 

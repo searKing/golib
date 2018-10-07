@@ -1,9 +1,9 @@
 package object
 
 import (
-	"runtime"
-	"reflect"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"strings"
 )
 

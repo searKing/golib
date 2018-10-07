@@ -1,10 +1,10 @@
 package exec
 
 import (
-	"os/exec"
-	"io"
 	"context"
+	"io"
 	"os"
+	"os/exec"
 )
 
 type commandSercer struct {

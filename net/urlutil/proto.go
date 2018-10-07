@@ -1,8 +1,8 @@
 package urlutil
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"strings"
 )
 

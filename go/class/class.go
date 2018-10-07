@@ -1,8 +1,8 @@
 package class
 
 import (
-	"reflect"
 	"fmt"
+	"reflect"
 )
 
 // 类的属性
@@ -76,6 +76,7 @@ var TypeError = func(prototype interface{}) error {
 var MakeVirtual = func(__proto__ interface{}, properties properties) {
 	makeVirtual(__proto__.(prototype), properties)
 }
+
 // 使用interface来规避虚函数问题
 // 传入一个旧的，生成一个新的
 var makeVirtual = func(__proto__ prototype, properties properties) {

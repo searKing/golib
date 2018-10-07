@@ -1,8 +1,8 @@
 package json
 
 import (
-	"io/ioutil"
 	"encoding/json"
+	"io/ioutil"
 )
 
 func ReadConfigFile(name string, v interface{}) error {

@@ -1,12 +1,12 @@
 package ini
 
 import (
-"bufio"
-"bytes"
-"fmt"
-"io"
-"io/ioutil"
-"strings"
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"strings"
 )
 
 func ReadConfigFile(name string) (*Config, error) {

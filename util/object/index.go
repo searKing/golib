@@ -12,12 +12,12 @@ func CheckIndex(index, length int) int {
 // {@code toIndex} (exclusive) is within the bounds of range from {@code 0}
 // (inclusive) to {@code length} (exclusive).
 func CheckFromToIndex(fromIndex, toIndex, length int) int {
-	return preconditions.CheckFromToIndex(fromIndex, toIndex, length);
+	return preconditions.CheckFromToIndex(fromIndex, toIndex, length)
 }
 
 // Checks if the sub-range from {@code fromIndex} (inclusive) to
 // {@code fromIndex + size} (exclusive) is within the bounds of range from
 // {@code 0} (inclusive) to {@code length} (exclusive).
 func CheckFromIndexSize(fromIndex, size, length int) int {
-	return preconditions.CheckFromIndexSize(fromIndex, size, length);
+	return preconditions.CheckFromIndexSize(fromIndex, size, length)
 }

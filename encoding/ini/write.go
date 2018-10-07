@@ -1,4 +1,5 @@
 package ini
+
 import (
 	"bytes"
 	"fmt"

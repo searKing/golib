@@ -9,6 +9,7 @@ var empty = &Optional{}
 var (
 	ErrorNoValuePresent = errors.New("No value present")
 )
+
 // Optional is a container object which may or may not contain a non-{@code null} value.
 // If a value is present, {@code isPresent()} returns {@code true}. If no
 // value is present, the object is considered <i>empty</i> and
@@ -82,8 +83,8 @@ type Predicater interface {
  *         {@code null}
  */
 func (o *Optional) IfPresent(action Consumer) {
-	if (o.IsPresent()) {
-		action.Accept(o.value);
+	if o.IsPresent() {
+		action.Accept(o.value)
 	}
 }
 
@@ -100,8 +101,8 @@ func (o *Optional) IfPresent(action Consumer) {
  * @since 9
  */
 func (o *Optional) IfPresentOrElse(action Consumer, emptyAction EmptyConsumer) {
-	if (o.IsPresent()) {
-		action.Accept(o.value);
+	if o.IsPresent() {
+		action.Accept(o.value)
 		return
 	}
 	emptyAction.Run()

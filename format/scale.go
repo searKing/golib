@@ -1,8 +1,8 @@
 package format
 
 import (
-	"github.com/searKing/x/format/radix"
 	"fmt"
+	"github.com/searKing/x/format/radix"
 	"github.com/searKing/x/format/unit"
 	"strconv"
 	"strings"
@@ -12,7 +12,7 @@ import (
 type kind int
 
 const (
-	kindUint  = iota
+	kindUint = iota
 	kindInt
 	kindFloat
 	kindUnset

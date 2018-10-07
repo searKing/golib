@@ -1,12 +1,12 @@
 package restful
 
 import (
-	"time"
-	"net/http"
+	"errors"
 	"io"
 	"io/ioutil"
-	"errors"
+	"net/http"
 	"strings"
+	"time"
 )
 
 const timeout = 4 * time.Second

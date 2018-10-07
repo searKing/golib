@@ -1,9 +1,9 @@
 package urlutil
 
 import (
-	"testing"
-	"reflect"
 	"fmt"
+	"reflect"
+	"testing"
 )
 
 type protoTests struct {
@@ -36,15 +36,15 @@ func TestParseProto(t *testing.T) {
 }
 
 var stringProtoTests = []struct {
-	proto  Proto
-	want string
+	proto Proto
+	want  string
 }{
 	// No leading slash on path should prepend slash on String() call
 	{
 		proto: Proto{
-			Type: "RTSP",
-			Major:   1,
-			Minor:   0,
+			Type:  "RTSP",
+			Major: 1,
+			Minor: 0,
 		},
 		want: "RTSP/1.0",
 	},
@@ -65,12 +65,13 @@ func TestProtoString(t *testing.T) {
 		}
 	}
 
-	for _,tt := range stringProtoTests {
+	for _, tt := range stringProtoTests {
 		if got := tt.proto.String(); got != tt.want {
 			t.Errorf("%+v.String() = %q; want %q", tt.proto, got, tt.want)
 		}
 	}
 }
+
 // more useful string for debugging than fmt's struct printer
 func pfmt(p *Proto) string {
 	return fmt.Sprintf("type=%q, major=%q, minor=%#v",

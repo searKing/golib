@@ -105,7 +105,7 @@ func RequireEqual(actual, expected interface{}, msg ...string) interface{} {
 	if msg == nil {
 		msg = []string{"miss match"}
 	}
-	if !Equals(actual,expected) {
+	if !Equals(actual, expected) {
 		panic(ErrorMissMatch(errors.New(strings.Join(msg, ""))))
 	}
 	return actual

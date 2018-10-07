@@ -29,7 +29,7 @@ func (r Radix) Valid() (bool, error) {
 	if _, ok := radixs[r]; ok {
 		return true, nil
 	}
-	return false,  fmt.Errorf("unimplement radix: %v", r)
+	return false, fmt.Errorf("unimplement radix: %v", r)
 }
 
 func IsDecimal(r Radix) (bool, error) {

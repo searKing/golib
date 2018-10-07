@@ -1,10 +1,10 @@
 package exec
 
 import (
-	"time"
 	"context"
-	"os/exec"
 	"io"
+	"os/exec"
+	"time"
 )
 
 func CommandWithTimeoutHandler(timeout time.Duration, name string, arg ...string) (data []byte, err error) {

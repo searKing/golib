@@ -2,7 +2,7 @@ package exec
 
 import "os/exec"
 
-func KillProcByName(pname string){
+func KillProcByName(pname string) {
 	params := []string{
 		"taskkill",
 		"/F",
@@ -10,5 +10,5 @@ func KillProcByName(pname string){
 		pname,
 		"/T",
 	}
-	exec.Command(params[0],params[1:]...).CombinedOutput()
+	exec.Command(params[0], params[1:]...).CombinedOutput()
 }

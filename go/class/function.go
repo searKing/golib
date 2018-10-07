@@ -1,9 +1,9 @@
 package class
 
 import (
-	"runtime"
-	"reflect"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"strings"
 )
 
@@ -17,4 +17,3 @@ func GetFunctionName(i interface{}) string {
 	name = strings.Split(name, "-")[0]       // foo
 	return name
 }
-

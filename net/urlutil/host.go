@@ -1,9 +1,9 @@
 package urlutil
 
 import (
-	"strings"
-	"net"
 	"golang_org/x/net/idna"
+	"net"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -38,6 +38,7 @@ func CleanHost(in string) string {
 	}
 	return net.JoinHostPort(a, port)
 }
+
 // removeZone removes IPv6 zone identifier from host.
 // E.g., "[fe80::1%en0]:8080" to "[fe80::1]:8080"
 func RemoveZone(host string) string {

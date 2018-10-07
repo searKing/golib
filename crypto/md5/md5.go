@@ -1,10 +1,10 @@
 package md5
 
 import (
-	"os"
-	"log"
 	"crypto/md5"
 	"io"
+	"log"
+	"os"
 )
 
 func MySelf() ([]byte, error) {

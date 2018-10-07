@@ -1,8 +1,8 @@
 package exec
 
 import (
-	"io"
 	"context"
+	"io"
 )
 
 func CommandWithCancel(handle func(reader io.Reader), name string, arg ...string) (err error) {

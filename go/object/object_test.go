@@ -1,9 +1,9 @@
 package object
 
 import (
-	"testing"
-	"reflect"
 	"fmt"
+	"reflect"
+	"testing"
 )
 
 //https://wizardforcel.gitbooks.io/gopl-zh/ch12/ch12-05.html

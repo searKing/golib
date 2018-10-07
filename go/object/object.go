@@ -1,8 +1,8 @@
 package object
 
 import (
-	"reflect"
 	"fmt"
+	"reflect"
 )
 
 // 类的属性
@@ -21,6 +21,7 @@ type Class struct {
 	properties
 	prototype
 }
+
 func (c *Class) SetProto(__proto__ prototype) {
 	c.__proto__ = __proto__
 }
@@ -89,6 +90,7 @@ func (*Father) Say() {
 func (Father) Speak() {
 	fmt.Printf("Speak Father\n")
 }
+
 // public Son : public Father
 // Son需要继承自Father，而需要对Father做访问权限控制，则想到增加代理类，如同智能指针一样， class就是代理类
 // MakeVirtual 为son的构造函数
@@ -102,9 +104,11 @@ func (*Son) Say(name string) {
 func (*Son) Hello(string) {
 	fmt.Printf("Say Son\n")
 }
-var MakeVirtual = func(__proto__ interface{}, properties properties)  {
-	 makeVirtual(__proto__.(prototype), properties)
+
+var MakeVirtual = func(__proto__ interface{}, properties properties) {
+	makeVirtual(__proto__.(prototype), properties)
 }
+
 // 使用interface来规避虚函数问题
 // 传入一个旧的，生成一个新的
 var makeVirtual = func(__proto__ prototype, properties properties) {
