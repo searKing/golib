@@ -12,57 +12,41 @@ import (
 )
 
 type ServerHandler interface {
-	HTTPHandler
-	ReadMsgHandler
-	HandleMsgHandler
-}
-type HTTPHandler interface {
-	HandleHTTP(http.ResponseWriter, *http.Request) error
-}
-type HTTPHandlerFunc func(http.ResponseWriter, *http.Request) error
-
-func (f HTTPHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
-	return f(w, r)
+	OnHandshakeHandler
+	OnOpenHandler
+	OnMsgReadHandler   //Block
+	OnMsgHandleHandler //Unblock
+	OnCloseHandler
+	OnErrorHandler
 }
 
-type ReadMsgHandler interface {
-	ReadMsg(conn WebSocketReadWriteCloser) (msg interface{}, err error)
-}
-type ReadMsgHandlerFunc func(conn WebSocketReadWriteCloser) (msg interface{}, err error)
-
-func (f ReadMsgHandlerFunc) ReadMsg(conn WebSocketReadWriteCloser) (msg interface{}, err error) {
-	return f(conn)
-}
-
-type HandleMsgHandler interface {
-	HandleMsg(conn WebSocketReadWriteCloser, msg interface{}) error
-}
-type HandleMsgHandlerFunc func(conn WebSocketReadWriteCloser, msg interface{}) error
-
-func (f HandleMsgHandlerFunc) HandleMsg(conn WebSocketReadWriteCloser, msg interface{}) error {
-	return f(conn, msg)
-}
-
-var NopHTTPHandler = HTTPHandlerFunc(func(http.ResponseWriter, *http.Request) error { return nil })
-var NopReadMsgHandler = ReadMsgHandlerFunc(func(conn WebSocketReadWriteCloser) (msg interface{}, err error) { return nil, nil })
-var NopMsgHandlerFunc = HandleMsgHandlerFunc(func(conn WebSocketReadWriteCloser, msg interface{}) error { return nil })
-
-func NewServerFunc(httpHandler HTTPHandler, readMsgHandler ReadMsgHandler, handleMsgHandler HandleMsgHandler) *Server {
+func NewServerFunc(onHandshake OnHandshakeHandler,
+	onOpen OnOpenHandler,
+	onMsgRead OnMsgReadHandler,
+	onMsgHandle OnMsgHandleHandler,
+	onClose OnCloseHandler,
+	onError OnErrorHandler) *Server {
 	return &Server{
-		HTTPHandler:      object.RequireNonNullElse(httpHandler, NopHTTPHandler).(HTTPHandler),
-		ReadMsgHandler:   object.RequireNonNullElse(readMsgHandler, NopReadMsgHandler).(ReadMsgHandler),
-		HandleMsgHandler: object.RequireNonNullElse(handleMsgHandler, NopMsgHandlerFunc).(HandleMsgHandler),
+		onHandshakeHandler: object.RequireNonNullElse(onHandshake, NopOnHandshakeHandler).(OnHandshakeHandler),
+		onOpenHandler:      object.RequireNonNullElse(onOpen, NopOnOpenHandler).(OnOpenHandler),
+		onMsgReadHandler:   object.RequireNonNullElse(onMsgRead, NopOnMsgReadHandler).(OnMsgReadHandler),
+		onMsgHandleHandler: object.RequireNonNullElse(onMsgHandle, NopOnMsgHandleHandler).(OnMsgHandleHandler),
+		onCloseHandler:     object.RequireNonNullElse(onClose, NopOnCloseHandler).(OnCloseHandler),
+		onErrorHandler:     object.RequireNonNullElse(onError, NopOnErrorHandler).(OnErrorHandler),
 	}
 }
 func NewServer(h ServerHandler) *Server {
-	return NewServerFunc(h, h, h)
+	return NewServerFunc(h, h, h, h, h, h)
 }
 
 type Server struct {
-	upgrader         websocket.Upgrader // use default options
-	HTTPHandler      HTTPHandler
-	ReadMsgHandler   ReadMsgHandler
-	HandleMsgHandler HandleMsgHandler
+	upgrader           websocket.Upgrader // use default options
+	onHandshakeHandler OnHandshakeHandler
+	onOpenHandler      OnOpenHandler
+	onMsgReadHandler   OnMsgReadHandler
+	onMsgHandleHandler OnMsgHandleHandler
+	onCloseHandler     OnCloseHandler
+	onErrorHandler     OnErrorHandler
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -84,7 +68,14 @@ type Server struct {
 	ConnState func(*WebSocketConn, ConnState)
 }
 
-// HandleHTTP takes over the http handler
+func (srv *Server) CheckError(conn WebSocketReadWriteCloser, err error) error {
+	if err == nil {
+		return nil
+	}
+	return srv.onErrorHandler.OnError(conn, err)
+}
+
+// OnHandshake takes over the http handler
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	if srv.shuttingDown() {
 		return ErrServerClosed
@@ -92,21 +83,27 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	// transfer http to websocket
 	srv.upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := srv.upgrader.Upgrade(w, r, nil)
-	if err != nil {
+	if srv.CheckError(nil, err) != nil {
 		return err
 	}
 	defer ws.Close()
 	ctx := context.WithValue(context.Background(), ServerContextKey, srv)
 	// Handle HTTP Handshake
-	err = srv.HTTPHandler.HandleHTTP(w, r)
-	if err != nil {
+	err = srv.onHandshakeHandler.OnHandshake(w, r)
+	if srv.CheckError(nil, err) != nil {
 		return err
 	}
 	// takeover the connect
 	c := srv.newConn(ws)
+	// Handle websocket On
+	err = srv.onOpenHandler.OnOpen(c.rwc)
+	if srv.CheckError(c.rwc, err) != nil {
+		c.close()
+		return err
+	}
 	c.setState(c.rwc, StateNew) // before Serve can return
-	c.serve(ctx)
-	return nil
+
+	return c.serve(ctx)
 }
 
 // Create new connection from rwc.

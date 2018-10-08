@@ -32,7 +32,7 @@ type conn struct {
 	// remoteAddr is rwc.RemoteAddr().String(). It is not populated synchronously
 	// inside the Listener's Accept goroutine, as some implementations block.
 	// It is populated immediately inside the (*conn).serve goroutine.
-	// This is the value of a HandleMsgHandler's (*Request).RemoteAddr.
+	// This is the value of a OnMsgHandleHandler's (*Request).RemoteAddr.
 	remoteAddr string
 
 	// werr is set to the first write error to rwc.
@@ -43,8 +43,10 @@ type conn struct {
 }
 
 // Close the connection.
-func (c *conn) close() {
+func (c *conn) close() error {
+	err := c.server.onCloseHandler.OnClose(checkConnErrorWebSocket{c: c})
 	c.rwc.Close()
+	return err
 }
 
 func (c *conn) setState(nc *WebSocketConn, state ConnState) {
@@ -65,10 +67,10 @@ func (c *conn) getState() (state ConnState, unixSec int64) {
 }
 
 // ErrAbortHandler is a sentinel panic value to abort a handler.
-// While any panic from ServeHTTP aborts the response to the client,
+// While any panic from OnHandshake aborts the response to the client,
 // panicking with ErrAbortHandler also suppresses logging of a stack
 // trace to the server's error log.
-var ErrAbortHandler = errors.New("net/websocket: abort HandleMsgHandler")
+var ErrAbortHandler = errors.New("net/websocket: abort OnMsgHandleHandler")
 var errTooLarge = errors.New("websocket: read too large")
 
 // isCommonNetReadError reports whether err is a common error
@@ -82,7 +84,7 @@ func isCommonNetReadError(err error) bool {
 	return false
 }
 
-// ReadMsgHandler next request from connection.
+// OnMsgReadHandler next request from connection.
 func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 
 	var (
@@ -103,7 +105,7 @@ func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 		}()
 	}
 	c.rwc.SetReadLimit(c.server.initialReadLimitSize())
-	req, err = c.server.ReadMsgHandler.ReadMsg(checkConnErrorWebSocket{c: c})
+	req, err = c.server.onMsgReadHandler.OnMsgRead(checkConnErrorWebSocket{c: c})
 	if err != nil {
 		if err == websocket.ErrReadLimit {
 			return nil, errTooLarge
@@ -123,7 +125,7 @@ func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 }
 
 // Serve a new connection.
-func (c *conn) serve(ctx context.Context) {
+func (c *conn) serve(ctx context.Context) (err error) {
 	c.remoteAddr = c.rwc.RemoteAddr().String()
 	ctx = context.WithValue(ctx, LocalAddrContextKey, c.rwc.LocalAddr())
 	// handle close
@@ -134,7 +136,7 @@ func (c *conn) serve(ctx context.Context) {
 			buf = buf[:runtime.Stack(buf, false)]
 			c.server.logf("websocket: panic serving %v: %v\n%s", c.remoteAddr, err, buf)
 		}
-		c.close()
+		c.server.CheckError(c.rwc, c.close())
 		c.setState(c.rwc, StateClosed)
 	}()
 
@@ -147,7 +149,7 @@ func (c *conn) serve(ctx context.Context) {
 	// read and handle the msg
 	dispatch.NewDispatch(dispatch.ReaderFunc(func() (interface{}, error) {
 		msg, err := c.readRequest(ctx)
-		if err != nil {
+		if c.server.CheckError(c.rwc, err) != nil {
 			if isCommonNetReadError(err) {
 				return nil, err // don't reply
 			}
@@ -156,12 +158,9 @@ func (c *conn) serve(ctx context.Context) {
 		c.setState(c.rwc, StateActive)
 		return msg, nil
 	}), dispatch.HandlerFunc(func(msg interface{}) error {
-		return c.server.HandleMsgHandler.HandleMsg(checkConnErrorWebSocket{c: c}, msg)
+		return c.server.CheckError(c.rwc, c.server.onMsgHandleHandler.OnMsgHandle(checkConnErrorWebSocket{c: c}, msg))
 	})).WithContext(ctx).Start()
-	finishConnect := func() {
-		c.rwc.Close()
-	}
-	finishConnect()
+	return
 }
 
 type WebSocketReader interface {
