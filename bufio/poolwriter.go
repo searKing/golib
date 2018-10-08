@@ -20,7 +20,7 @@ func NewWriterPoolSize(size int) *WriterPool {
 	}
 }
 
-func (p *WriterPool) Put(br *bufio.Reader) {
+func (p *WriterPool) Put(br *bufio.Writer) {
 	br.Reset(nil)
 	p.pool.Put(br)
 }
