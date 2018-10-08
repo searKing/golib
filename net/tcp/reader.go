@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// connReader is the io.ReadMsgHandler wrapper used by *conn. It combines a
+// connReader is the io.onMsgRead wrapper used by *conn. It combines a
 // selectively-activated io.LimitedReader (to bound request header
-// read sizes) with support for selectively keeping an io.ReadMsgHandler.ReadMsgHandler
+// read sizes) with support for selectively keeping an io.onMsgRead.onMsgRead
 // call blocked in a background goroutine to wait for activity and
 // trigger a CloseNotifier channel.
 type connReader struct {
@@ -38,7 +38,7 @@ func (cr *connReader) startBackgroundRead() {
 	cr.lock()
 	defer cr.unlock()
 	if cr.inRead {
-		panic("invalid concurrent Body.ReadMsgHandler call")
+		panic("invalid concurrent Body.onMsgRead call")
 	}
 	if cr.hasByte {
 		return
@@ -61,7 +61,7 @@ func (cr *connReader) backgroundRead() {
 		// but the behavior was documented as only "may", and we only
 		// did that because that's how CloseNotify accidentally behaved
 		// in very early Go releases prior to context support. Once we
-		// added context support, people used a HandleMsgHandler's
+		// added context support, people used a onMsgHandle's
 		// Request.Context() and passed it along. Having that context
 		// cancel on pipelined HTTP requests caused problems.
 		// Fortunately, almost nothing uses HTTP/1.x pipelining.
@@ -107,7 +107,7 @@ func (cr *connReader) setReadLimit(remain int64) { cr.remain = remain }
 func (cr *connReader) setInfiniteReadLimit()     { cr.remain = maxInt64 }
 func (cr *connReader) hitReadLimit() bool        { return cr.remain <= 0 }
 
-// handleReadError is called whenever a ReadMsgHandler from the client returns a
+// handleReadError is called whenever a onMsgRead from the client returns a
 // non-nil error.
 //
 // The provided non-nil err is almost always io.EOF or a "use of
@@ -125,7 +125,7 @@ func (cr *connReader) Read(p []byte) (n int, err error) {
 	cr.lock()
 	if cr.inRead {
 		cr.unlock()
-		panic("invalid concurrent Body.ReadMsgHandler call")
+		panic("invalid concurrent Body.onMsgRead call")
 	}
 	if cr.hitReadLimit() {
 		cr.unlock()

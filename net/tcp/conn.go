@@ -38,7 +38,7 @@ type conn struct {
 	// remoteAddr is rwc.RemoteAddr().String(). It is not populated synchronously
 	// inside the Listener's Accept goroutine, as some implementations block.
 	// It is populated immediately inside the (*conn).serve goroutine.
-	// This is the value of a HandleMsgHandler's (*Request).RemoteAddr.
+	// This is the value of a onMsgHandle's (*Request).RemoteAddr.
 	remoteAddr string
 
 	// werr is set to the first write error to rwc.
@@ -61,7 +61,7 @@ type conn struct {
 
 func (c *conn) finalFlush() {
 	if c.bufr != nil {
-		// Steal the bufio.ReadMsgHandler (~4KB worth of memory) and its associated
+		// Steal the bufio.onMsgRead (~4KB worth of memory) and its associated
 		// reader for a future connection.
 		putBufioReader(c.bufr)
 		c.bufr = nil
@@ -80,6 +80,7 @@ func (c *conn) finalFlush() {
 func (c *conn) close() {
 	c.finalFlush()
 	c.rwc.Close()
+	c.r.abortPendingRead()
 }
 
 // rstAvoidanceDelay is the amount of time we sleep after closing the
@@ -135,10 +136,10 @@ func (c *conn) getState() (state ConnState, unixSec int64) {
 }
 
 // ErrAbortHandler is a sentinel panic value to abort a handler.
-// While any panic from ServeHTTP aborts the response to the client,
+// While any panic from OnHandshake aborts the response to the client,
 // panicking with ErrAbortHandler also suppresses logging of a stack
 // trace to the server's error log.
-var ErrAbortHandler = errors.New("net/tcp: abort HandleMsgHandler")
+var ErrAbortHandler = errors.New("net/tcp: abort onMsgHandle")
 var errTooLarge = errors.New("tcp: read too large")
 
 // isCommonNetReadError reports whether err is a common error
@@ -158,7 +159,7 @@ func isCommonNetReadError(err error) bool {
 	return false
 }
 
-// ReadMsgHandler next request from connection.
+// onMsgRead next request from connection.
 func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 
 	var (
@@ -180,7 +181,7 @@ func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 	}
 
 	c.r.setReadLimit(c.server.initialReadLimitSize())
-	req, err = c.server.ReadMsgHandler.ReadMsg(c.bufr)
+	req, err = c.server.ReadMsgHandler.OnMsgRead(c.bufr)
 	if err != nil {
 		if c.r.hitReadLimit() {
 			return nil, errTooLarge
@@ -242,16 +243,10 @@ func (c *conn) serve(ctx context.Context) {
 		}
 		return msg, nil
 	}), dispatch.HandlerFunc(func(msg interface{}) error {
-		return c.server.HandleMsgHandler.HandleMsg(c.bufw, msg)
+		return c.server.HandleMsgHandler.OnMsgHandle(c.bufw, msg)
 	})).WithContext(ctx).Start()
-	// after HandleMsgHandler, read all left data
+	// after onMsgHandle, read all left data
 	c.r.startBackgroundRead()
-	finishConnect := func() {
-		c.bufw.Flush()
-		c.rwc.Close()
-		c.r.abortPendingRead()
-	}
-	finishConnect()
 }
 
 // checkConnErrorWriter writes to c.rwc and records any write errors to c.werr.

@@ -13,43 +13,27 @@ import (
 )
 
 type ServerHandler interface {
-	ReadMsgHandler
-	HandleMsgHandler
-}
-type ReadMsgHandler interface {
-	ReadMsg(b *bufio.Reader) (msg interface{}, err error)
-}
-type ReadMsgHandlerFunc func(b *bufio.Reader) (msg interface{}, err error)
-
-func (f ReadMsgHandlerFunc) ReadMsg(b *bufio.Reader) (msg interface{}, err error) {
-	return f(b)
+	OnMsgReadHandler
+	OnMsgHandleHandler
 }
 
-type HandleMsgHandler interface {
-	HandleMsg(b *bufio.Writer, msg interface{}) error
-}
-type HandleMsgHandlerFunc func(b *bufio.Writer, msg interface{}) error
-
-func (f HandleMsgHandlerFunc) HandleMsg(b *bufio.Writer, msg interface{}) error {
-	return f(b, msg)
-}
-func NewServerFunc(readMsgHandler ReadMsgHandler, handleMsgHandler HandleMsgHandler) *Server {
+func NewServerFunc(readMsgHandler OnMsgReadHandler, handleMsgHandler OnMsgHandleHandler) *Server {
 	return &Server{
-		ReadMsgHandler:   object.RequireNonNullElse(readMsgHandler, NopReadMsgHandler).(ReadMsgHandler),
-		HandleMsgHandler: object.RequireNonNullElse(handleMsgHandler, NopMsgHandlerFunc).(HandleMsgHandler),
+		ReadMsgHandler:   object.RequireNonNullElse(readMsgHandler, NopReadMsgHandler).(OnMsgReadHandler),
+		HandleMsgHandler: object.RequireNonNullElse(handleMsgHandler, NopMsgHandlerFunc).(OnMsgHandleHandler),
 	}
 }
 func NewServer(h ServerHandler) *Server {
 	return NewServerFunc(h, h)
 }
 
-var NopReadMsgHandler = ReadMsgHandlerFunc(func(b *bufio.Reader) (msg interface{}, err error) { return nil, nil })
-var NopMsgHandlerFunc = HandleMsgHandlerFunc(func(b *bufio.Writer, msg interface{}) error { return nil })
+var NopReadMsgHandler = OnMsgReadHandlerFunc(func(b *bufio.Reader) (msg interface{}, err error) { return nil, nil })
+var NopMsgHandlerFunc = OnMsgHandleHandlerFunc(func(b *bufio.Writer, msg interface{}) error { return nil })
 
 type Server struct {
 	Addr             string // TCP address to listen on, ":tcp" if empty
-	ReadMsgHandler   ReadMsgHandler
-	HandleMsgHandler HandleMsgHandler
+	ReadMsgHandler   OnMsgReadHandler
+	HandleMsgHandler OnMsgHandleHandler
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -152,7 +136,7 @@ func (s *Server) logf(format string, args ...interface{}) {
 	}
 }
 
-func ListenAndServe(addr string, readMsg ReadMsgHandler, handleMsg HandleMsgHandler) error {
+func ListenAndServe(addr string, readMsg OnMsgReadHandler, handleMsg OnMsgHandleHandler) error {
 	server := &Server{Addr: addr, ReadMsgHandler: readMsg, HandleMsgHandler: handleMsg}
 	return server.ListenAndServe()
 }

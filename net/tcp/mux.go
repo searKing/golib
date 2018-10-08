@@ -7,25 +7,25 @@ import (
 )
 
 type Handler interface {
-	ReadMsgHandler
-	HandleMsgHandler
+	OnMsgReadHandler
+	OnMsgHandleHandler
 }
 type handlerFunc struct {
-	read   ReadMsgHandler
-	handle HandleMsgHandler
+	read   OnMsgReadHandler
+	handle OnMsgHandleHandler
 }
 
 func HandlerFunc(read func(b *bufio.Reader) (msg interface{}, err error), handle func(b *bufio.Writer, msg interface{}) error) Handler {
 	return &handlerFunc{
-		read:   ReadMsgHandlerFunc(read),
-		handle: HandleMsgHandlerFunc(handle),
+		read:   OnMsgReadHandlerFunc(read),
+		handle: OnMsgHandleHandlerFunc(handle),
 	}
 }
-func (f handlerFunc) ReadMsg(b *bufio.Reader) (msg interface{}, err error) {
-	return f.read.ReadMsg(b)
+func (f handlerFunc) OnMsgRead(b *bufio.Reader) (msg interface{}, err error) {
+	return f.read.OnMsgRead(b)
 }
-func (f handlerFunc) HandleMsg(b *bufio.Writer, msg interface{}) error {
-	return f.handle.HandleMsg(b, msg)
+func (f handlerFunc) OnMsgHandle(b *bufio.Writer, msg interface{}) error {
+	return f.handle.OnMsgHandle(b, msg)
 }
 
 type ServeMux struct {
@@ -43,12 +43,12 @@ var DefaultServeMux = &defaultServeMux
 
 var defaultServeMux ServeMux
 
-func (mux *ServeMux) ReadMsg(b *bufio.Reader) (req interface{}, err error) {
-	return mux.msgHandler.ReadMsg(b)
+func (mux *ServeMux) OnMsgRead(b *bufio.Reader) (req interface{}, err error) {
+	return mux.msgHandler.OnMsgRead(b)
 }
 
-func (mux *ServeMux) HandleMsg(b *bufio.Writer, msg interface{}) error {
-	return mux.msgHandler.HandleMsg(b, msg)
+func (mux *ServeMux) OnMsgHandle(b *bufio.Writer, msg interface{}) error {
+	return mux.msgHandler.OnMsgHandle(b, msg)
 }
 func (mux *ServeMux) Handle(handler Handler) {
 	mux.mu.Lock()
