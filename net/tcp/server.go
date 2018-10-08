@@ -1,11 +1,11 @@
 package tcp
 
 import (
-	"bufio"
 	"context"
 	"github.com/searKing/golib/time/delay"
 	"github.com/searKing/golib/util/object"
 	"go.uber.org/atomic"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -27,8 +27,8 @@ func NewServer(h ServerHandler) *Server {
 	return NewServerFunc(h, h)
 }
 
-var NopReadMsgHandler = OnMsgReadHandlerFunc(func(b *bufio.Reader) (msg interface{}, err error) { return nil, nil })
-var NopMsgHandlerFunc = OnMsgHandleHandlerFunc(func(b *bufio.Writer, msg interface{}) error { return nil })
+var NopReadMsgHandler = OnMsgReadHandlerFunc(func(b io.Reader) (msg interface{}, err error) { return nil, nil })
+var NopMsgHandlerFunc = OnMsgHandleHandlerFunc(func(b io.Writer, msg interface{}) error { return nil })
 
 type Server struct {
 	Addr             string // TCP address to listen on, ":tcp" if empty

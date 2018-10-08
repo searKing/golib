@@ -1,7 +1,6 @@
 package tcp
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"github.com/searKing/dispatch"
@@ -49,36 +48,16 @@ type conn struct {
 	// io.LimitedReader-style limiting (while reading request headers)
 	// and functionality to support CloseNotifier. See *connReader docs.
 	r *connReader
-
-	// bufr reads from r.
-	bufr *bufio.Reader
-
-	// bufw writes to checkConnErrorWriter{c}, which populates werr on error.
-	bufw *bufio.Writer
+	w *checkConnErrorWriter
 
 	curState struct{ atomic uint64 } // packed (unixtime<<8|uint8(ConnState))
 }
 
 func (c *conn) finalFlush() {
-	if c.bufr != nil {
-		// Steal the bufio.onMsgRead (~4KB worth of memory) and its associated
-		// reader for a future connection.
-		putBufioReader(c.bufr)
-		c.bufr = nil
-	}
-
-	if c.bufw != nil {
-		c.bufw.Flush()
-		// Steal the bufio.Writer (~4KB worth of memory) and its associated
-		// writer for a future connection.
-		putBufioWriter(c.bufw)
-		c.bufw = nil
-	}
 }
 
 // Close the connection.
 func (c *conn) close() {
-	c.finalFlush()
 	c.rwc.Close()
 	c.r.abortPendingRead()
 }
@@ -181,7 +160,7 @@ func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 	}
 
 	c.r.setReadLimit(c.server.initialReadLimitSize())
-	req, err = c.server.ReadMsgHandler.OnMsgRead(c.bufr)
+	req, err = c.server.ReadMsgHandler.OnMsgRead(c.r)
 	if err != nil {
 		if c.r.hitReadLimit() {
 			return nil, errTooLarge
@@ -223,8 +202,7 @@ func (c *conn) serve(ctx context.Context) {
 
 	// wrap original conn itself with buffer
 	c.r = &connReader{conn: c}
-	c.bufr = newBufioReader(c.r)
-	c.bufw = newBufioWriterSize(checkConnErrorWriter{c}, 4<<10)
+	c.w = &checkConnErrorWriter{c: c}
 
 	// read and handle the msg
 	dispatch.NewDispatch(dispatch.ReaderFunc(func() (interface{}, error) {
@@ -243,7 +221,7 @@ func (c *conn) serve(ctx context.Context) {
 		}
 		return msg, nil
 	}), dispatch.HandlerFunc(func(msg interface{}) error {
-		return c.server.HandleMsgHandler.OnMsgHandle(c.bufw, msg)
+		return c.server.HandleMsgHandler.OnMsgHandle(c.w, msg)
 	})).WithContext(ctx).Start()
 	// after onMsgHandle, read all left data
 	c.r.startBackgroundRead()
