@@ -5,7 +5,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/searKing/golib/util/object"
 	"net/http"
-	"net/url"
 )
 
 type ClientHandler interface {
@@ -19,7 +18,6 @@ type ClientHandler interface {
 type Client struct {
 	*Server
 	httpRespHandler OnHTTPResponseHandler
-	url             url.URL
 }
 
 func NewClientFunc(onHTTPRespHandler OnHTTPResponseHandler,
@@ -36,14 +34,17 @@ func NewClientFunc(onHTTPRespHandler OnHTTPResponseHandler,
 func NewClient(h ClientHandler) *Client {
 	return NewClientFunc(h, h, h, h, h, h)
 }
+func (cli *Client) ServeAndListen() error {
+	return ErrUnImplement
+}
 
 // OnHandshake takes over the http handler
-func (cli *Client) ServeHTTP(requestHeader http.Header) error {
+func (cli *Client) DialAndServe(urlStr string, requestHeader http.Header) error {
 	if cli.shuttingDown() {
-		return ErrServerClosed
+		return ErrClientClosed
 	}
 	// transfer http to websocket
-	ws, resp, err := websocket.DefaultDialer.Dial(cli.url.String(), requestHeader)
+	ws, resp, err := websocket.DefaultDialer.Dial(urlStr, requestHeader)
 	if cli.Server.CheckError(nil, err) != nil {
 		return err
 	}
@@ -65,6 +66,6 @@ func (cli *Client) ServeHTTP(requestHeader http.Header) error {
 		return err
 	}
 	c.setState(c.rwc, StateNew) // before Serve can return
-
-	return c.serve(ctx)
+	c.serve(ctx)
+	return nil
 }

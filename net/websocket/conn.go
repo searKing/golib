@@ -125,7 +125,7 @@ func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 }
 
 // Serve a new connection.
-func (c *conn) serve(ctx context.Context) (err error) {
+func (c *conn) serve(ctx context.Context) {
 	c.remoteAddr = c.rwc.RemoteAddr().String()
 	ctx = context.WithValue(ctx, LocalAddrContextKey, c.rwc.LocalAddr())
 	// handle close

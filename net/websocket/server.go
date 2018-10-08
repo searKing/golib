@@ -103,7 +103,8 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	}
 	c.setState(c.rwc, StateNew) // before Serve can return
 
-	return c.serve(ctx)
+	c.serve(ctx)
+	return nil
 }
 
 // Create new connection from rwc.
