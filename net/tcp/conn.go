@@ -57,9 +57,11 @@ func (c *conn) finalFlush() {
 }
 
 // Close the connection.
-func (c *conn) close() {
+func (c *conn) close() error {
+	err := c.server.onCloseHandler.OnClose(c.w, c.r)
 	c.rwc.Close()
 	c.r.abortPendingRead()
+	return err
 }
 
 // rstAvoidanceDelay is the amount of time we sleep after closing the
@@ -160,7 +162,7 @@ func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 	}
 
 	c.r.setReadLimit(c.server.initialReadLimitSize())
-	req, err = c.server.ReadMsgHandler.OnMsgRead(c.r)
+	req, err = c.server.onMsgReadHandler.OnMsgRead(c.r)
 	if err != nil {
 		if c.r.hitReadLimit() {
 			return nil, errTooLarge
@@ -190,7 +192,7 @@ func (c *conn) serve(ctx context.Context) {
 			buf = buf[:runtime.Stack(buf, false)]
 			c.server.logf("tcp: panic serving %v: %v\n%s", c.remoteAddr, err, buf)
 		}
-		c.close()
+		c.server.CheckError(c.w, c.r, c.close())
 		c.setState(c.rwc, StateClosed)
 	}()
 
@@ -211,7 +213,7 @@ func (c *conn) serve(ctx context.Context) {
 			// If we read any bytes off the wire, we're active.
 			c.setState(c.rwc, StateActive)
 		}
-		if err != nil {
+		if err = c.server.CheckError(c.w, c.r, err); err != nil {
 			if isCommonNetReadError(err) {
 				return nil, err // don't reply
 			}
@@ -221,7 +223,7 @@ func (c *conn) serve(ctx context.Context) {
 		}
 		return msg, nil
 	}), dispatch.HandlerFunc(func(msg interface{}) error {
-		return c.server.HandleMsgHandler.OnMsgHandle(c.w, msg)
+		return c.server.CheckError(c.w, c.r, c.server.onMsgHandleHandler.OnMsgHandle(c.w, msg))
 	})).WithContext(ctx).Start()
 	// after onMsgHandle, read all left data
 	c.r.startBackgroundRead()

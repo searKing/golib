@@ -32,7 +32,7 @@ type conn struct {
 	// remoteAddr is rwc.RemoteAddr().String(). It is not populated synchronously
 	// inside the Listener's Accept goroutine, as some implementations block.
 	// It is populated immediately inside the (*conn).serve goroutine.
-	// This is the value of a OnMsgHandleHandler's (*Request).RemoteAddr.
+	// This is the value of a onMsgHandleHandler's (*Request).RemoteAddr.
 	remoteAddr string
 
 	// werr is set to the first write error to rwc.
@@ -70,7 +70,7 @@ func (c *conn) getState() (state ConnState, unixSec int64) {
 // While any panic from OnHandshake aborts the response to the client,
 // panicking with ErrAbortHandler also suppresses logging of a stack
 // trace to the server's error log.
-var ErrAbortHandler = errors.New("net/websocket: abort OnMsgHandleHandler")
+var ErrAbortHandler = errors.New("net/websocket: abort onMsgHandleHandler")
 var errTooLarge = errors.New("websocket: read too large")
 
 // isCommonNetReadError reports whether err is a common error
@@ -84,7 +84,7 @@ func isCommonNetReadError(err error) bool {
 	return false
 }
 
-// OnMsgReadHandler next request from connection.
+// onMsgReadHandler next request from connection.
 func (c *conn) readRequest(ctx context.Context) (req interface{}, err error) {
 
 	var (
@@ -149,7 +149,7 @@ func (c *conn) serve(ctx context.Context) (err error) {
 	// read and handle the msg
 	dispatch.NewDispatch(dispatch.ReaderFunc(func() (interface{}, error) {
 		msg, err := c.readRequest(ctx)
-		if c.server.CheckError(c.rwc, err) != nil {
+		if err = c.server.CheckError(c.rwc, err); err != nil {
 			if isCommonNetReadError(err) {
 				return nil, err // don't reply
 			}

@@ -13,27 +13,38 @@ import (
 )
 
 type ServerHandler interface {
+	OnOpenHandler
 	OnMsgReadHandler
 	OnMsgHandleHandler
+	OnCloseHandler
+	OnErrorHandler
 }
 
-func NewServerFunc(readMsgHandler OnMsgReadHandler, handleMsgHandler OnMsgHandleHandler) *Server {
+func NewServerFunc(
+	onOpen OnOpenHandler,
+	onMsgRead OnMsgReadHandler,
+	onMsgHandle OnMsgHandleHandler,
+	onClose OnCloseHandler,
+	onError OnErrorHandler) *Server {
 	return &Server{
-		ReadMsgHandler:   object.RequireNonNullElse(readMsgHandler, NopReadMsgHandler).(OnMsgReadHandler),
-		HandleMsgHandler: object.RequireNonNullElse(handleMsgHandler, NopMsgHandlerFunc).(OnMsgHandleHandler),
+		onOpenHandler:      object.RequireNonNullElse(onOpen, NopOnOpenHandler).(OnOpenHandler),
+		onMsgReadHandler:   object.RequireNonNullElse(onMsgRead, NopOnMsgReadHandler).(OnMsgReadHandler),
+		onMsgHandleHandler: object.RequireNonNullElse(onMsgHandle, NopOnMsgHandleHandler).(OnMsgHandleHandler),
+		onCloseHandler:     object.RequireNonNullElse(onClose, NopOnCloseHandler).(OnCloseHandler),
+		onErrorHandler:     object.RequireNonNullElse(onError, NopOnErrorHandler).(OnErrorHandler),
 	}
 }
 func NewServer(h ServerHandler) *Server {
-	return NewServerFunc(h, h)
+	return NewServerFunc(h, h, h, h, h)
 }
 
-var NopReadMsgHandler = OnMsgReadHandlerFunc(func(b io.Reader) (msg interface{}, err error) { return nil, nil })
-var NopMsgHandlerFunc = OnMsgHandleHandlerFunc(func(b io.Writer, msg interface{}) error { return nil })
-
 type Server struct {
-	Addr             string // TCP address to listen on, ":tcp" if empty
-	ReadMsgHandler   OnMsgReadHandler
-	HandleMsgHandler OnMsgHandleHandler
+	Addr               string // TCP address to listen on, ":tcp" if empty
+	onOpenHandler      OnOpenHandler
+	onMsgReadHandler   OnMsgReadHandler
+	onMsgHandleHandler OnMsgHandleHandler
+	onCloseHandler     OnCloseHandler
+	onErrorHandler     OnErrorHandler
 
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -57,16 +68,23 @@ type Server struct {
 	ConnState func(net.Conn, ConnState)
 }
 
+func (srv *Server) CheckError(w io.Writer, r io.Reader, err error) error {
+	if err == nil {
+		return nil
+	}
+	return srv.onErrorHandler.OnError(w, r, err)
+}
+
 func (srv *Server) ListenAndServe() error {
 	if srv.shuttingDown() {
-		return ErrServerClosed
+		return srv.CheckError(nil, nil, ErrServerClosed)
 	}
 	addr := srv.Addr
 	if addr == "" {
 		addr = ":tcp"
 	}
 	ln, err := net.Listen("tcp", addr)
-	if err != nil {
+	if srv.CheckError(nil, nil, err) != nil {
 		return err
 	}
 	return srv.Serve(tcpKeepAliveListener{ln.(*net.TCPListener)})
@@ -95,12 +113,18 @@ func (srv *Server) Serve(l net.Listener) error {
 				continue
 			}
 			// return otherwise
-			return e
+			return srv.CheckError(nil, nil, e)
 		}
 		tempDelay.Reset()
 
 		// takeover the connect
 		c := srv.newConn(rw)
+		// Handle websocket On
+		err := srv.onOpenHandler.OnOpen(c.rwc)
+		if err = srv.CheckError(c.w, c.r, err); err != nil {
+			c.close()
+			return err
+		}
 		c.setState(c.rwc, StateNew) // before Serve can return
 		go c.serve(ctx)
 	}
@@ -137,6 +161,6 @@ func (s *Server) logf(format string, args ...interface{}) {
 }
 
 func ListenAndServe(addr string, readMsg OnMsgReadHandler, handleMsg OnMsgHandleHandler) error {
-	server := &Server{Addr: addr, ReadMsgHandler: readMsg, HandleMsgHandler: handleMsg}
+	server := &Server{Addr: addr, onMsgReadHandler: readMsg, onMsgHandleHandler: handleMsg}
 	return server.ListenAndServe()
 }

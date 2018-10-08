@@ -97,7 +97,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	c := srv.newConn(ws)
 	// Handle websocket On
 	err = srv.onOpenHandler.OnOpen(c.rwc)
-	if srv.CheckError(c.rwc, err) != nil {
+	if err = srv.CheckError(c.rwc, err); err != nil {
 		c.close()
 		return err
 	}

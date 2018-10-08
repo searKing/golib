@@ -60,7 +60,7 @@ func (cli *Client) ServeHTTP(requestHeader http.Header) error {
 	c := cli.Server.newConn(ws)
 	// Handle websocket On
 	err = cli.Server.onOpenHandler.OnOpen(c.rwc)
-	if cli.Server.CheckError(c.rwc, err) != nil {
+	if err = cli.Server.CheckError(c.rwc, err); err != nil {
 		c.close()
 		return err
 	}
