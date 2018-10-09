@@ -27,15 +27,15 @@ func (mux *ServeMux) OnOpen(conn net.Conn) error {
 	return mux.msgHandler.OnOpen(conn)
 }
 
-func (mux *ServeMux) OnMsgRead(b io.Reader) (req interface{}, err error) {
-	return mux.msgHandler.OnMsgRead(b)
+func (mux *ServeMux) OnMsgRead(r io.Reader) (req interface{}, err error) {
+	return mux.msgHandler.OnMsgRead(r)
 }
 
-func (mux *ServeMux) OnMsgHandle(b io.Writer, msg interface{}) error {
-	return mux.msgHandler.OnMsgHandle(b, msg)
+func (mux *ServeMux) OnMsgHandle(w io.Writer, msg interface{}) error {
+	return mux.msgHandler.OnMsgHandle(w, msg)
 }
 func (mux *ServeMux) OnClose(w io.Writer, r io.Reader) error {
-	return mux.msgHandler.OnMsgHandle(w, r)
+	return mux.msgHandler.OnClose(w, r)
 }
 func (mux *ServeMux) OnError(w io.Writer, r io.Reader, err error) error {
 	return mux.msgHandler.OnError(w, r, err)
