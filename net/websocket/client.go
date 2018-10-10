@@ -34,7 +34,9 @@ func NewClientFunc(onHTTPRespHandler OnHTTPResponseHandler,
 func NewClient(h ClientHandler) *Client {
 	return NewClientFunc(h, h, h, h, h, h)
 }
-func (cli *Client) ServeAndListen() error {
+
+// Deprecated: use DialAndServe instead.
+func (cli *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) error {
 	return ErrUnImplement
 }
 
