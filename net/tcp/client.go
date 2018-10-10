@@ -5,14 +5,6 @@ import (
 	"net"
 )
 
-type ClientHandler interface {
-	OnOpenHandler
-	OnMsgReadHandler
-	OnMsgHandleHandler
-	OnCloseHandler
-	OnErrorHandler
-}
-
 type Client struct {
 	*Server
 }
@@ -26,7 +18,7 @@ func NewClientFunc(onOpenHandler OnOpenHandler,
 		Server: NewServerFunc(onOpenHandler, onMsgReadHandler, onMsgHandleHandler, onCloseHandler, onErrorHandler),
 	}
 }
-func NewClient(h ClientHandler) *Client {
+func NewClient(h Handler) *Client {
 	return NewClientFunc(h, h, h, h, h)
 }
 

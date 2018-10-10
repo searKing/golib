@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type ServerHandler interface {
+type Handler interface {
 	OnOpenHandler
 	OnMsgReadHandler
 	OnMsgHandleHandler
@@ -34,7 +34,7 @@ func NewServerFunc(
 		onErrorHandler:     object.RequireNonNullElse(onError, NopOnErrorHandler).(OnErrorHandler),
 	}
 }
-func NewServer(h ServerHandler) *Server {
+func NewServer(h Handler) *Server {
 	return NewServerFunc(h, h, h, h, h)
 }
 
