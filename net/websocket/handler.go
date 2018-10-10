@@ -75,8 +75,6 @@ var nopSC = &nopServerClient{}
 type NopServer struct{ nopServerClient }
 type NopClient struct{ nopServerClient }
 type nopServerClient struct {
-	ServerHandler
-	ClientHandler
 }
 
 func (srv *nopServerClient) OnHandshake(w http.ResponseWriter, r *http.Request) error { return nil }

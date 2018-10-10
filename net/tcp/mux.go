@@ -59,7 +59,6 @@ func NotFoundHandler() ServerHandler { return &NotFound{} }
 // NotFoundHandler returns a simple request handler
 // that replies to each request with a ``404 page not found'' reply.
 type NotFound struct {
-	ServerHandler
 	NopServer
 }
 
