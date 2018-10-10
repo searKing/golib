@@ -30,6 +30,7 @@ func NewClient(h ClientHandler) *Client {
 	return NewClientFunc(h, h, h, h, h)
 }
 
+// Deprecated: use DialAndServe instead.
 func (cli *Client) ListenAndServe() error {
 	return ErrUnImplement
 }
