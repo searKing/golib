@@ -20,6 +20,9 @@ type Supplier interface {
 // IsNil returns {@code true} if the provided reference is {@code nil} otherwise
 // returns {@code false}.
 func IsNil(obj interface{}) bool {
+	if obj == nil {
+		return true
+	}
 	if IsNilable(obj) {
 		return reflect.ValueOf(obj).IsNil()
 	}
