@@ -9,6 +9,9 @@ import (
 // DeepCopys returns a interface consisting of the deeply copying elements.
 // just clone public&clonable elems - upper case - name & IsCloneable()==true
 func DeepClone(obj interface{}) (copy interface{}) {
+	if obj == nil {
+		return nil
+	}
 	if IsNilable(obj) || !IsCloneable(obj) {
 		return obj
 	}
