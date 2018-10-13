@@ -239,3 +239,12 @@ func (w checkConnErrorWebSocket) ReadJSON(v interface{}) error {
 	}
 	return err
 }
+
+func (w checkConnErrorWebSocket) Close() error {
+	err := w.c.rwc.Close()
+	if err != nil && w.c.werr == nil {
+		w.c.werr = err
+		w.c.cancelCtx()
+	}
+	return err
+}
