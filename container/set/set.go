@@ -76,7 +76,6 @@ func (s *Set) Add(e interface{}) *Set {
 
 // Remove removes the specified element from this set if it is present.
 func (s *Set) Remove(e interface{}) *Set {
-	s.lazyInit()
 	if !s.Contains(e) {
 		return s
 	}
@@ -107,7 +106,6 @@ func (s *Set) ContainsAll(stream *slice.Stream) bool {
 // they're not already present (optional operation).
 func (s *Set) AddAll(stream *slice.Stream) *Set {
 	object.RequireNonNil(stream)
-	s.lazyInit()
 	stream.ForEach(func(e interface{}) {
 		s.Add(e)
 	})
@@ -122,7 +120,6 @@ func (s *Set) AddAll(stream *slice.Stream) *Set {
 // the action may be performed in whatever thread the library chooses.
 func (s *Set) AddAllOrdered(stream *slice.Stream) *Set {
 	object.RequireNonNil(stream)
-	s.lazyInit()
 	stream.ForEachOrdered(func(e interface{}) {
 		s.Add(e)
 	})
@@ -135,7 +132,6 @@ func (s *Set) AddAllOrdered(stream *slice.Stream) *Set {
 // specified collection.
 func (s *Set) RetainAll(stream *slice.Stream) *Set {
 	object.RequireNonNil(stream)
-	s.lazyInit()
 	if s.IsEmpty() {
 		return s
 	}
@@ -156,7 +152,6 @@ func (s *Set) RetainAll(stream *slice.Stream) *Set {
 // the two sets.
 func (s *Set) RemoveAll(stream *slice.Stream) *Set {
 	object.RequireNonNil(stream)
-	s.lazyInit()
 	if s.IsEmpty() {
 		return s
 	}

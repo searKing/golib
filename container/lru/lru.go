@@ -15,24 +15,42 @@ type Pair struct {
 	Value interface{}
 }
 
-func (cl *LRU) Keys() []interface{} {
+func NewLRU() *LRU {
+	return &LRU{}
+}
+
+// Init initializes or clears list l.
+func (lru *LRU) Init() *LRU {
+	lru.ll = &list.List{}
+	lru.m = make(map[interface{}]*list.Element)
+	return lru
+}
+
+// lazyInit lazily initializes a zero List value.
+func (lru *LRU) lazyInit() {
+	if lru.ll == nil {
+		lru.Init()
+	}
+}
+
+func (lru *LRU) Keys() []interface{} {
 	keys := []interface{}{}
-	for key, _ := range cl.m {
+	for key, _ := range lru.m {
 		keys = append(keys, key)
 	}
 	return keys
 }
-func (cl *LRU) Values() []interface{} {
+func (lru *LRU) Values() []interface{} {
 	values := []interface{}{}
-	for _, value := range cl.m {
+	for _, value := range lru.m {
 		values = append(values, value)
 	}
 	return values
 }
 
-func (cl *LRU) Pairs() []Pair {
+func (lru *LRU) Pairs() []Pair {
 	pairs := []Pair{}
-	for key, value := range cl.m {
+	for key, value := range lru.m {
 		pairs = append(pairs, Pair{
 			Key:   key,
 			Value: value,
@@ -40,68 +58,67 @@ func (cl *LRU) Pairs() []Pair {
 	}
 	return pairs
 }
-func (cl *LRU) AddPair(pair Pair) error {
-	return cl.Add(pair.Key, pair.Value)
+func (lru *LRU) AddPair(pair Pair) error {
+	return lru.Add(pair.Key, pair.Value)
 }
 
 // add adds Key to the head of the linked list.
-func (cl *LRU) Add(key interface{}, value interface{}) error {
-	if cl.ll == nil {
-		cl.ll = list.New()
-		cl.m = make(map[interface{}]*list.Element)
-	}
-	ele := cl.ll.PushFront(Pair{
+func (lru *LRU) Add(key interface{}, value interface{}) error {
+	lru.lazyInit()
+	ele := lru.ll.PushFront(Pair{
 		Key:   key,
 		Value: value,
 	})
-	if _, ok := cl.m[key]; ok {
+	if _, ok := lru.m[key]; ok {
 		return errors.New("Key was already in LRU")
 	}
-	cl.m[key] = ele
+	lru.m[key] = ele
 	return nil
 }
 
-func (cl *LRU) AddOrUpdate(key interface{}, value interface{}) {
-	cl.Remove(key)
-	cl.Add(key, value)
+func (lru *LRU) AddOrUpdate(key interface{}, value interface{}) {
+	lru.Remove(key)
+	lru.Add(key, value)
 }
 
-func (cl *LRU) RemoveOldest() interface{} {
-	if cl.ll == nil {
+func (lru *LRU) RemoveOldest() interface{} {
+	if lru.ll == nil {
 		return nil
 	}
-	ele := cl.ll.Back()
+	ele := lru.ll.Back()
 	pair := ele.Value.(Pair)
-	cl.ll.Remove(ele)
-	delete(cl.m, pair.Key)
-	return pair.Value
+	v := lru.ll.Remove(ele)
+	delete(lru.m, pair.Key)
+	return v
 }
 
 // Remove removes Key from cl.
-func (cl *LRU) Remove(key interface{}) {
-	if ele, ok := cl.m[key]; ok {
-		cl.ll.Remove(ele)
-		delete(cl.m, key)
+func (lru *LRU) Remove(key interface{}) interface{} {
+	if ele, ok := lru.m[key]; ok {
+		v := lru.ll.Remove(ele)
+		delete(lru.m, key)
+		return v
 	}
+	return nil
 }
 
-func (cl *LRU) Find(key interface{}) (interface{}, bool) {
-	e, ok := cl.m[key]
+func (lru *LRU) Find(key interface{}) (interface{}, bool) {
+	e, ok := lru.m[key]
 	if !ok {
 		return nil, ok
 	}
 	return e.Value.(Pair).Value, true
 }
 
-func (cl *LRU) Peek(key interface{}) (interface{}, bool) {
-	e, ok := cl.m[key]
+func (lru *LRU) Peek(key interface{}) (interface{}, bool) {
+	e, ok := lru.m[key]
 	if ok {
-		cl.Remove(key)
+		lru.Remove(key)
 	}
 	return e.Value.(Pair).Value, ok
 }
 
 // Len returns the number of items in the cache.
-func (cl *LRU) Len() int {
-	return len(cl.m)
+func (lru *LRU) Len() int {
+	return len(lru.m)
 }

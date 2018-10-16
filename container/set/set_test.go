@@ -7,6 +7,10 @@ import (
 func Test(t *testing.T) {
 	s := New()
 
+	if s.Count() != 0 {
+		t.Errorf("Length should be 0")
+	}
+	s.Remove(0)
 	s.Add(5)
 
 	if s.Count() != 1 {

@@ -8,64 +8,80 @@ type KeyLRU struct {
 	m  map[interface{}]*list.Element
 }
 
-func (cl *KeyLRU) Keys() []interface{} {
+func NewKeyLRU() *KeyLRU {
+	return &KeyLRU{}
+}
+
+// Init initializes or clears list l.
+func (lru *KeyLRU) Init() *KeyLRU {
+	lru.ll = &list.List{}
+	lru.m = make(map[interface{}]*list.Element)
+	return lru
+}
+
+// lazyInit lazily initializes a zero List value.
+func (lru *KeyLRU) lazyInit() {
+	if lru.ll == nil {
+		lru.Init()
+	}
+}
+func (lru *KeyLRU) Keys() []interface{} {
 	keys := []interface{}{}
-	for key, _ := range cl.m {
+	for key, _ := range lru.m {
 		keys = append(keys, key)
 	}
 	return keys
 }
 
 // add adds Key to the head of the linked list.
-func (cl *KeyLRU) Add(key interface{}) {
-	if cl.ll == nil {
-		cl.ll = list.New()
-		cl.m = make(map[interface{}]*list.Element)
-	}
-	ele := cl.ll.PushFront(key)
-	if _, ok := cl.m[key]; ok {
+func (lru *KeyLRU) Add(key interface{}) {
+	lru.lazyInit()
+	ele := lru.ll.PushFront(key)
+	if _, ok := lru.m[key]; ok {
 		panic("persistConn was already in LRU")
 	}
-	cl.m[key] = ele
+	lru.m[key] = ele
 }
-func (cl *KeyLRU) AddOrUpdate(key interface{}, value interface{}) {
-	cl.Remove(key)
-	cl.Add(key)
+func (lru *KeyLRU) AddOrUpdate(key interface{}, value interface{}) {
+	lru.Remove(key)
+	lru.Add(key)
 }
 
-func (cl *KeyLRU) RemoveOldest() interface{} {
-	if cl.ll == nil {
+func (lru *KeyLRU) RemoveOldest() interface{} {
+	if lru.ll == nil {
 		return nil
 	}
-	ele := cl.ll.Back()
+	ele := lru.ll.Back()
 	key := ele.Value.(interface{})
-	cl.ll.Remove(ele)
-	delete(cl.m, key)
+	lru.ll.Remove(ele)
+	delete(lru.m, key)
 	return key
 }
 
 // Remove removes Key from cl.
-func (cl *KeyLRU) Remove(key interface{}) {
-	if ele, ok := cl.m[key]; ok {
-		cl.ll.Remove(ele)
-		delete(cl.m, key)
+func (lru *KeyLRU) Remove(key interface{}) interface{} {
+	if ele, ok := lru.m[key]; ok {
+		v := lru.ll.Remove(ele)
+		delete(lru.m, key)
+		return v
 	}
+	return nil
 }
 
-func (cl *KeyLRU) Find(key interface{}) (interface{}, bool) {
-	e, ok := cl.m[key]
+func (lru *KeyLRU) Find(key interface{}) (interface{}, bool) {
+	e, ok := lru.m[key]
 	return e, ok
 }
 
-func (cl *KeyLRU) Peek(key interface{}) (interface{}, bool) {
-	e, ok := cl.m[key]
+func (lru *KeyLRU) Peek(key interface{}) (interface{}, bool) {
+	e, ok := lru.m[key]
 	if ok {
-		cl.Remove(key)
+		lru.Remove(key)
 	}
 	return e, ok
 }
 
 // Len returns the number of items in the cache.
-func (cl *KeyLRU) Len() int {
-	return len(cl.m)
+func (lru *KeyLRU) Len() int {
+	return len(lru.m)
 }
