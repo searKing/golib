@@ -16,7 +16,7 @@ import (
 // target: "[ipv6-host]" returns host: "ipv6-host", port: "443"
 // target: ":80" returns host: "localhost", port: "80"
 // target: ":" returns host: "localhost", port: "443"
-func ParseHostPort(hostport string, getDefaultPort func(schema string) string) (host, port string, err error) {
+func ParseHostPort(scheme string, hostport string, getDefaultPort func(schema string) (string, error)) (host, port string, err error) {
 	if hostport == "" {
 		return "", "", errors.New("missing hostport")
 	}
@@ -24,11 +24,17 @@ func ParseHostPort(hostport string, getDefaultPort func(schema string) string) (
 		return "", "", errors.New("missing getDefaultPort")
 	}
 
+	// justIP, no port follow
 	if ip := net.ParseIP(hostport); ip != nil {
 		// hostport is an IPv4 or IPv6(without brackets) address
-		return hostport, getDefaultPort(), nil
+		port, err := getDefaultPort(scheme)
+		if err != nil {
+			return "", "", err
+		}
+		return hostport, port, nil
 	}
-	if host, port, err := net.SplitHostPort(hostport); err == nil {
+
+	if host, port, err = net.SplitHostPort(hostport); err == nil {
 		// hostport has port, i.e ipv4-host:port, [ipv6-host]:port, host-name:port
 		if host == "" {
 			// Keep consistent with net.Dial(): If the host is empty, as in ":80", the local system is assumed.
@@ -36,11 +42,19 @@ func ParseHostPort(hostport string, getDefaultPort func(schema string) string) (
 		}
 		if port == "" {
 			// If the port field is empty(hostport ends with colon), e.g. "[::1]:", defaultPort is used.
-			port = getDefaultPort()
+			port, err = getDefaultPort(scheme)
+			if err != nil {
+				return "", "", err
+			}
 		}
 		return host, port, nil
 	}
-	if host, port, err := net.SplitHostPort(hostport + ":" + getDefaultPort()); err == nil {
+	// missing port
+	defaultPort, err := getDefaultPort(scheme)
+	if err != nil {
+		return "", "", err
+	}
+	if host, port, err = net.SplitHostPort(hostport + ":" + defaultPort); err == nil {
 		// hostport doesn't have port
 		return host, port, nil
 	}

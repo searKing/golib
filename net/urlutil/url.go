@@ -28,14 +28,14 @@ var portMap = map[string]string{
 	"turns":  "5349",
 }
 
-func ParseURL(rawUrl string, getDefaultPort func(schema string) string) (u *url.URL, host string, port int, err error) {
+func ParseURL(rawUrl string, getDefaultPort func(schema string) (string, error)) (u *url.URL, host string, port int, err error) {
 	if getDefaultPort == nil {
-		getDefaultPort = func(schema string) string {
+		getDefaultPort = func(schema string) (string, error) {
 			port, ok := portMap[schema]
 			if ok {
-				return port
+				return port, nil
 			}
-			return ""
+			return "", fmt.Errorf("malformed schema:%s", schema)
 		}
 	}
 
@@ -49,7 +49,7 @@ func ParseURL(rawUrl string, getDefaultPort func(schema string) string) (u *url.
 	} else {
 		hostport = standUrl.Opaque
 	}
-	rawHost, rawPort, err := ParseHostPort(hostport, getDefaultPort)
+	rawHost, rawPort, err := ParseHostPort(standUrl.Scheme, hostport, getDefaultPort)
 	if err != nil {
 		return nil, "", -1, err
 	}
