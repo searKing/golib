@@ -28,7 +28,7 @@ func ParseSchemeType(s string) (Scheme, error) {
 	case SchemeSTUN, SchemeSTUNS, SchemeTURN, SchemeTURNS:
 		return scheme, nil
 	default:
-		return "", fmt.Errorf("parse :::: unknown scheme %s", s)
+		return "", fmt.Errorf("malformed scheme %s", s)
 	}
 }
 
@@ -37,6 +37,6 @@ func (t Scheme) String() string {
 	case SchemeSTUN, SchemeSTUNS, SchemeTURN, SchemeTURNS:
 		return string(t)
 	default:
-		return fmt.Errorf("parse :::: unknown scheme %s", t).Error()
+		return fmt.Errorf("malformed scheme %s", t).Error()
 	}
 }
