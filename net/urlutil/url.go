@@ -1,16 +1,14 @@
 package urlutil
 
 import (
+	"fmt"
 	"net/url"
+	"strconv"
 )
 
-// parseURL is just urlutil.Parse. It exists only so that urlutil.Parse can be called
-// in places where urlutil is shadowed for godoc. See https://golang.org/cl/49930.
-var parseURL = url.Parse
+func ParseStandardURL(rawUrl string) (*url.URL, error) {
 
-func ParseURL(url string) (*url.URL, error) {
-
-	u, err := parseURL(url) // Just urlutil.Parse (urlutil is shadowed for godoc).
+	u, err := url.Parse(rawUrl) // Just urlutil.Parse (urlutil is shadowed for godoc).
 	if err != nil {
 		return nil, err
 	}
@@ -18,4 +16,46 @@ func ParseURL(url string) (*url.URL, error) {
 	u.Host = removeEmptyPort(u.Host)
 
 	return u, nil
+}
+
+var portMap = map[string]string{
+	"http":   "80",
+	"https":  "443",
+	"socks5": "1080",
+	"stun":   "3478",
+	"turn":   "3478",
+	"stuns":  "5349",
+	"turns":  "5349",
+}
+
+func ParseURL(rawUrl string, getDefaultPort func(schema string) string) (u *url.URL, host string, port int, err error) {
+	if getDefaultPort == nil {
+		getDefaultPort = func(schema string) string {
+			port, ok := portMap[schema]
+			if ok {
+				return port
+			}
+			return ""
+		}
+	}
+
+	standUrl, err := ParseStandardURL(rawUrl)
+	if err != nil {
+		return nil, "", -1, err
+	}
+	var hostport string
+	if standUrl.Opaque == "" {
+		hostport = standUrl.Host
+	} else {
+		hostport = standUrl.Opaque
+	}
+	rawHost, rawPort, err := ParseHostPort(hostport, getDefaultPort)
+	if err != nil {
+		return nil, "", -1, err
+	}
+	host = rawHost
+	if port, err = strconv.Atoi(rawPort); err != nil {
+		return nil, "", -1, fmt.Errorf("malformed port:%s", rawPort)
+	}
+	return standUrl, host, port, nil
 }

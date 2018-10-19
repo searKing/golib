@@ -1,7 +1,7 @@
 package urlutil
 
 import (
-	"golang_org/x/net/idna"
+	"golang.org/x/net/idna"
 	"net"
 	"strings"
 	"unicode/utf8"
