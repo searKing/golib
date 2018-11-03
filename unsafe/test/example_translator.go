@@ -39,6 +39,6 @@ func ExampleCStringArray() {
 	//[]string 转化成 char**
 	box := []string{"xing", "jack", "john", "searKing"}
 	cCharArray, n := unsafe2.CStringArray(box...)
-
+	defer C.free(unsafe.Pointer(cCharArray))
 	C.showStringArray((**C.char)(unsafe.Pointer(cCharArray)), C.int(n))
 }
