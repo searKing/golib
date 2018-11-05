@@ -6,5 +6,4 @@ type NullPointerException struct {
 
 func NewNullPointerException(message string) ThrowableInterface {
 	return &NullPointerException{}
-
 }

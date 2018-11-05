@@ -29,6 +29,7 @@ type ThrowableInterface interface {
 	fillInStackTrack()
 	GetSuppressed() []ThrowableInterface
 	GetStackTrace() []byte
+	Error() string
 }
 type Throwable struct {
 	detailMessage        string

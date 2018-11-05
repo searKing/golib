@@ -54,3 +54,32 @@ func GoStringArray(strArray unsafe.Pointer, n int) []string {
 	}
 	return strs
 }
+
+//// []unsafe.Pointer -> ** unsafe.Pointer
+//func CPointerArray(strs []unsafe.Pointer) (*unsafe.Pointer, C.int) {
+//	return (*unsafe.Pointer)(unsafe.Pointer(&strs[0])), C.int(len(strs))
+//}
+//
+//// char** -> []interface{}
+//func GoPointerArray(pointerArray *unsafe.Pointer, n int) []unsafe.Pointer {
+//	cPointerArray := make([]unsafe.Pointer, n)
+//	header := (*reflect.SliceHeader)(unsafe.Pointer(&cPointerArray))
+//	header.Cap = n
+//	header.Len = n
+//	header.Data = uintptr(unsafe.Pointer(pointerArray))
+//	return cPointerArray
+//}
+//
+//func CAnyArray(strs []interface{}) (*unsafe.Pointer, C.int) {
+//	return (*unsafe.Pointer)(unsafe.Pointer(&strs[0])), C.int(len(strs))
+//}
+//
+//// char** -> []interface{}
+//func GoAnyArray(anyArray *unsafe.Pointer, n int) []interface{} {
+//	cAnyArray := make([]interface{}, n)
+//	header := (*reflect.SliceHeader)(unsafe.Pointer(&cAnyArray))
+//	header.Cap = n
+//	header.Len = n
+//	header.Data = uintptr(unsafe.Pointer(anyArray))
+//	return cAnyArray
+//}
