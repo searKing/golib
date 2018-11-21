@@ -29,7 +29,6 @@ type Dispatch struct {
 	reader              Reader
 	handler             Handler
 	handlerParallelChan chan struct{}
-	isHandlerParallel   bool
 	wg                  WaitGroup
 	ctx                 context.Context
 }
