@@ -207,7 +207,7 @@ func (c *conn) serve(ctx context.Context) {
 	c.w = &checkConnErrorWriter{c: c}
 
 	// read and handle the msg
-	dispatch.NewDispatch(dispatch.ReaderFunc(func() (interface{}, error) {
+	dispatch.NewDispatch(dispatch.ReaderFunc(func(ctx context.Context) (interface{}, error) {
 		msg, err := c.readRequest(ctx)
 		if c.r.remain != c.server.initialReadLimitSize() {
 			// If we read any bytes off the wire, we're active.
@@ -222,7 +222,7 @@ func (c *conn) serve(ctx context.Context) {
 			return nil, err
 		}
 		return msg, nil
-	}), dispatch.HandlerFunc(func(msg interface{}) error {
+	}), dispatch.HandlerFunc(func(ctx context.Context, msg interface{}) error {
 		return c.server.CheckError(c.w, c.r, c.server.onMsgHandleHandler.OnMsgHandle(c.w, msg))
 	})).WithContext(ctx).Start()
 	// after onMsgHandle, read all left data

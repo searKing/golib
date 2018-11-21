@@ -147,7 +147,7 @@ func (c *conn) serve(ctx context.Context) {
 	defer cancelCtx()
 
 	// read and handle the msg
-	dispatch.NewDispatch(dispatch.ReaderFunc(func() (interface{}, error) {
+	dispatch.NewDispatch(dispatch.ReaderFunc(func(ctx context.Context) (interface{}, error) {
 		msg, err := c.readRequest(ctx)
 		if err = c.server.CheckError(c.rwc, err); err != nil {
 			if isCommonNetReadError(err) {
@@ -157,7 +157,7 @@ func (c *conn) serve(ctx context.Context) {
 		}
 		c.setState(c.rwc, StateActive)
 		return msg, nil
-	}), dispatch.HandlerFunc(func(msg interface{}) error {
+	}), dispatch.HandlerFunc(func(ctx context.Context, msg interface{}) error {
 		return c.server.CheckError(c.rwc, c.server.onMsgHandleHandler.OnMsgHandle(checkConnErrorWebSocket{c: c}, msg))
 	})).WithContext(ctx).Start()
 	return

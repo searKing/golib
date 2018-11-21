@@ -6,36 +6,52 @@ import (
 )
 
 type Reader interface {
-	Read() (interface{}, error)
+	Read(ctx context.Context) (msg interface{}, err error)
 }
-type ReaderFunc func() (interface{}, error)
+type ReaderFunc func(ctx context.Context) (msg interface{}, err error)
 
-func (f ReaderFunc) Read() (interface{}, error) {
-	return f()
+func (f ReaderFunc) Read(ctx context.Context) (msg interface{}, err error) {
+	return f(ctx)
 }
 
 type Handler interface {
-	Handle(interface{}) error
+	Handle(ctx context.Context, msg interface{}) error
 }
-type HandlerFunc func(interface{}) error
+type HandlerFunc func(ctx context.Context, msg interface{}) error
 
-func (f HandlerFunc) Handle(msg interface{}) error {
-	return f(msg)
+func (f HandlerFunc) Handle(ctx context.Context, msg interface{}) error {
+	return f(ctx, msg)
 }
+
+type DispatchCategory int
+
+const (
+	DispatchCategoryHandleParrllel DispatchCategory = iota
+	DispatchCategoryHandleSerial
+)
 
 // Dispatch is a middleman between the Reader and Processor.
 type Dispatch struct {
-	reader  Reader
-	handler Handler
-
-	wg  WaitGroup
-	ctx context.Context
+	reader            Reader
+	handler           Handler
+	isHandlerParallel bool
+	wg                WaitGroup
+	ctx               context.Context
 }
 
 func NewDispatch(reader Reader, handler Handler) *Dispatch {
+	return NewDispatch3(reader, handler, DispatchCategoryHandleParrllel)
+}
+func NewDispatch3(reader Reader, handler Handler, category DispatchCategory) *Dispatch {
+	var isHandlerParallel bool
+	if category == DispatchCategoryHandleParrllel {
+		isHandlerParallel = true
+	}
+
 	return &Dispatch{
-		reader:  reader,
-		handler: handler,
+		reader:            reader,
+		handler:           handler,
+		isHandlerParallel: isHandlerParallel,
 	}
 }
 func (d *Dispatch) Context() context.Context {
@@ -62,12 +78,19 @@ func (d *Dispatch) done() bool {
 		return false
 	}
 }
+func (d *Dispatch) Read() (interface{}, error) {
+	return d.reader.Read(d.Context())
+}
 func (d *Dispatch) Handle(msg interface{}) error {
-	return func(wg WaitGroup) error {
+	fn := func(wg WaitGroup) error {
 		wg.Add(1)
 		defer wg.Done()
-		return d.handler.Handle(msg)
-	}(d.waitGroup())
+		return d.handler.Handle(d.Context(), msg)
+	}
+	if d.isHandlerParallel {
+		go fn((d.waitGroup()))
+	}
+	return fn(d.waitGroup())
 }
 
 // 遍历读取消息，并进行分发处理
@@ -76,13 +99,13 @@ func (d *Dispatch) Start() *Dispatch {
 		wg.Add(1)
 		defer wg.Done()
 		for {
-			msg, err := d.reader.Read()
+			msg, err := d.Read()
 			if err != nil {
 				break
 			}
 			// just dispatch non-nil msg
 			if msg != nil {
-				go d.Handle(msg)
+				d.Handle(msg)
 			}
 
 			// break if dispatcher is canceled or done
