@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"context"
+	"errors"
 	"sync"
 )
 
@@ -23,36 +24,30 @@ func (f HandlerFunc) Handle(ctx context.Context, msg interface{}) error {
 	return f(ctx, msg)
 }
 
-type DispatchCategory int
-
-const (
-	DispatchCategoryHandleParrllel DispatchCategory = iota
-	DispatchCategoryHandleSerial
-)
-
 // Dispatch is a middleman between the Reader and Processor.
 type Dispatch struct {
-	reader            Reader
-	handler           Handler
-	isHandlerParallel bool
-	wg                WaitGroup
-	ctx               context.Context
+	reader              Reader
+	handler             Handler
+	handlerParallelChan chan struct{}
+	isHandlerParallel   bool
+	wg                  WaitGroup
+	ctx                 context.Context
 }
 
 func NewDispatch(reader Reader, handler Handler) *Dispatch {
-	return NewDispatch3(reader, handler, DispatchCategoryHandleParrllel)
+	return NewDispatch3(reader, handler, -1)
 }
-func NewDispatch3(reader Reader, handler Handler, category DispatchCategory) *Dispatch {
-	var isHandlerParallel bool
-	if category == DispatchCategoryHandleParrllel {
-		isHandlerParallel = true
+func NewDispatch3(reader Reader, handler Handler, concurrentMax int) *Dispatch {
+
+	dispatch := &Dispatch{
+		reader:  reader,
+		handler: handler,
+	}
+	if concurrentMax >= 0 {
+		dispatch.handlerParallelChan = make(chan struct{}, concurrentMax)
 	}
 
-	return &Dispatch{
-		reader:            reader,
-		handler:           handler,
-		isHandlerParallel: isHandlerParallel,
-	}
+	return dispatch
 }
 func (d *Dispatch) Context() context.Context {
 	if d.ctx != nil {
@@ -78,8 +73,27 @@ func (d *Dispatch) done() bool {
 		return false
 	}
 }
+
+func (d *Dispatch) AllowHandleInGroutine() bool {
+	return d.handlerParallelChan != nil
+}
 func (d *Dispatch) Read() (interface{}, error) {
 	return d.reader.Read(d.Context())
+}
+
+func (d *Dispatch) GetHandleGoroutine() bool {
+	select {
+	case d.handlerParallelChan <- struct{}{}:
+		return true
+	case <-d.Context().Done(): // chan close
+		return false
+	}
+}
+func (d *Dispatch) PutHandleGoroutine() {
+	select {
+	case <-d.handlerParallelChan:
+	default:
+	}
 }
 func (d *Dispatch) Handle(msg interface{}) error {
 	fn := func(wg WaitGroup) error {
@@ -87,10 +101,19 @@ func (d *Dispatch) Handle(msg interface{}) error {
 		defer wg.Done()
 		return d.handler.Handle(d.Context(), msg)
 	}
-	if d.isHandlerParallel {
-		go fn((d.waitGroup()))
+	if !d.AllowHandleInGroutine() {
+		return fn(d.waitGroup())
 	}
-	return fn(d.waitGroup())
+	// Block if the number of handle goRoutines meets concurrentMax
+	if !d.GetHandleGoroutine() {
+		// Handle canceled
+		return errors.New("GetHandleGoroutine failed, Dispatch is canceled")
+	}
+	go func() {
+		defer d.PutHandleGoroutine()
+		fn((d.waitGroup()))
+	}()
+	return nil
 }
 
 // 遍历读取消息，并进行分发处理
