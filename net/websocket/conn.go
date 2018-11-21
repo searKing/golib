@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/gorilla/websocket"
-	"github.com/searKing/dispatch"
+	"github.com/searKing/golib/x/dispatch"
 	"runtime"
 	"sync/atomic"
 	"time"

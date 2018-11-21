@@ -3,7 +3,7 @@ package tcp
 import (
 	"context"
 	"errors"
-	"github.com/searKing/dispatch"
+	"github.com/searKing/golib/x/dispatch"
 	"io"
 	"net"
 	"runtime"
