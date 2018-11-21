@@ -3,6 +3,7 @@ package dispatch
 import (
 	"context"
 	"errors"
+	"github.com/searKing/golib/lang"
 	"sync"
 )
 
@@ -81,6 +82,9 @@ func (d *Dispatch) Read() (interface{}, error) {
 }
 
 func (d *Dispatch) GetHandleGoroutine() bool {
+	if !d.AllowHandleInGroutine() {
+		panic(lang.NewIllegalStateException1("unexpected operation"))
+	}
 	select {
 	case d.handlerParallelChan <- struct{}{}:
 		return true
@@ -89,6 +93,9 @@ func (d *Dispatch) GetHandleGoroutine() bool {
 	}
 }
 func (d *Dispatch) PutHandleGoroutine() {
+	if !d.AllowHandleInGroutine() {
+		panic(lang.NewIllegalStateException1("unexpected operation"))
+	}
 	select {
 	case <-d.handlerParallelChan:
 	default:
