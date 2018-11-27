@@ -5,6 +5,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/searKing/golib/util/object"
 	"net/http"
+	"time"
 )
 
 type ClientHandler interface {
@@ -46,7 +47,9 @@ func (cli *Client) DialAndServe(urlStr string, requestHeader http.Header) error 
 		return ErrClientClosed
 	}
 	// transfer http to websocket
-	ws, resp, err := websocket.DefaultDialer.Dial(urlStr, requestHeader)
+	dialer := *websocket.DefaultDialer
+	dialer.HandshakeTimeout = time.Second
+	ws, resp, err := dialer.Dial(urlStr, requestHeader)
 	if cli.Server.CheckError(nil, err) != nil {
 		return err
 	}
