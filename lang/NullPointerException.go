@@ -1,7 +1,7 @@
 package lang
 
 type NullPointerException struct {
-	ThrowableInterface
+	*Exception
 }
 
 func NewNullPointerException(message string) ThrowableInterface {
