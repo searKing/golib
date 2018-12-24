@@ -3,7 +3,7 @@ package websocket
 import (
 	"github.com/gorilla/websocket"
 	"github.com/searKing/golib/util/object"
-	"gitlab.hobot.cc/haixin.chen/gomvc/transport"
+	"gitlab.hobot.cc/haixin.chen/go-mvc/transport"
 	"sync"
 )
 
