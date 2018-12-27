@@ -196,6 +196,7 @@ func (e *Element) Insert(prefix []byte, value interface{}) {
 		if cur.Key == NilKey {
 			cur.Key = k
 		}
+		// goto left
 		if k < cur.Key {
 			left := cur.Left()
 			if left == nil {
@@ -204,6 +205,7 @@ func (e *Element) Insert(prefix []byte, value interface{}) {
 			cur = cur.left
 			continue
 		}
+		// goto right
 		if k > cur.Key {
 			right := cur.Right()
 			if right == nil {
@@ -212,11 +214,14 @@ func (e *Element) Insert(prefix []byte, value interface{}) {
 			cur = cur.right
 			continue
 		}
+		// key match, goto match next layer
 		idx++
+		// all matched, goto set the value
 		if idx == len(prefix) {
 			cur.Value = value
 			return
 		}
+		// partial matched, goto middle on next layer
 		middle := cur.Middle()
 		if middle == nil {
 			cur.middle = newElement(NilKey, nil)
