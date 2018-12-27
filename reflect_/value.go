@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/searKing/golib/bytes_"
+	"github.com/searKing/golib/container/traversal"
 	"reflect"
 )
 
@@ -67,6 +68,32 @@ type fieldValueInfo struct {
 	depth int
 }
 
+func (thiz fieldValueInfo) Middles() []interface{} {
+
+	if !thiz.val.IsValid() {
+		return nil
+	}
+	if IsNilType(thiz.val.Type()) {
+		return nil
+	}
+	typ := FollowTypePointer(thiz.val.Type())
+	val := FollowValuePointer(thiz.val)
+	if val.Kind() != reflect.Struct {
+		return nil
+	}
+
+	middles := []interface{}{}
+	// Scan typ for fields to include.
+	for i := 0; i < val.NumField(); i++ {
+		middles = append(middles, fieldValueInfo{
+			val:   val.Field(i),
+			sf:    typ.Field(i),
+			depth: thiz.depth + 1,
+		})
+	}
+	return middles
+}
+
 func (thiz *fieldValueInfo) String() string {
 	//if IsNilValue(thiz.val) {
 	//	return fmt.Sprintf("%+v", nil)
@@ -85,91 +112,21 @@ func (thiz *fieldValueInfo) String() string {
 	return "[" + thiz.val.Type().String() + ":" + fmt.Sprintf(" %+v", thiz.val) + "]"
 }
 func WalkValueDFS(val reflect.Value, parseFn func(info fieldValueInfo) (goon bool)) {
-	// Types already visited at an earlier level.
-	// FIXME I havenot seen any case which can trigger visited
-	visited := map[reflect.Value]bool{}
-	walkValueDFS(val, 0, visited, parseFn)
-}
-
-func walkValueDFS(val reflect.Value, depth int, visited map[reflect.Value]bool, parseFn func(info fieldValueInfo) (goon bool)) (goon bool) {
-	if visited[val] {
-		return true
-	}
-	visited[val] = true
-	if !parseFn(fieldValueInfo{val: val, depth: depth}) {
-		return false
-	}
-	if !val.IsValid() {
-		return true
-	}
-	if IsNilType(val.Type()) {
-		return true
-	}
-
-	if FollowValuePointer(val).Kind() != reflect.Struct {
-		return true
-	}
-	// Scan typ for fields to include.
-	for i := 0; i < val.NumField(); i++ {
-		sf := val.Field(i)
-		if !walkValueDFS(sf, depth+1, visited, parseFn) {
-			return false
-		}
-	}
-	return true
+	traversal.TraversalBFS(fieldValueInfo{
+		val: val,
+	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
+		return parseFn(ele.(fieldValueInfo))
+	})
 }
 
 // Breadth First Search
 func WalkValueBFS(val reflect.Value, parseFn func(info fieldValueInfo) (goon bool)) {
-	// Types already visited at an earlier level.
-	// FIXME I havenot seen any case which can trigger visited
-	visited := map[reflect.Value]bool{}
-	fvi := fieldValueInfo{val: val}
-	if !parseFn(fvi) {
-		return
-	}
-	walkValueBFS(fvi, visited, parseFn)
+	traversal.TraversalBFS(fieldValueInfo{val: val},
+		nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
+			return parseFn(ele.(fieldValueInfo))
+		})
 }
-func walkValueBFS(fvi fieldValueInfo, visited map[reflect.Value]bool, parseFn func(info fieldValueInfo) (goon bool)) (goon bool) {
-	depth := fvi.depth
-	if visited[fvi.val] {
-		return true
-	}
-	visited[fvi.val] = true
-	if !fvi.val.IsValid() {
-		return true
-	}
-	if IsNilType(fvi.val.Type()) {
-		return true
-	}
-	if FollowValuePointer(fvi.val).Kind() != reflect.Struct {
-		return true
-	}
-	// Anonymous fields to explore at the current level and the next.
-	next := []reflect.Value{}
 
-	depth++
-	// Scan typ for fields to include.
-	for i := 0; i < fvi.val.NumField(); i++ {
-		sfv := fvi.val.Field(i)
-		if visited[sfv] {
-			continue
-		}
-		visited[sfv] = true
-
-		if !parseFn(fieldValueInfo{val: sfv, sf: fvi.val.Type().Field(i), depth: depth}) {
-			return false
-		}
-
-		next = append(next, sfv)
-	}
-	for _, sf := range next {
-		if !walkValueDFS(sf, depth, visited, parseFn) {
-			return false
-		}
-	}
-	return true
-}
 func DumpValueInfoDFS(v reflect.Value) string {
 	dumpInfo := &bytes.Buffer{}
 	first := true

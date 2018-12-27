@@ -19,7 +19,7 @@ func (n *Node) LeftNodes() []Node {
 }
 func (n *Node) MiddleNodes() []Node {
 	middles := []Node{}
-	for _, e := range n.Lefts() {
+	for _, e := range n.Middles() {
 		node := Node{
 			ele:   e,
 			depth: n.depth + 1,
@@ -30,7 +30,7 @@ func (n *Node) MiddleNodes() []Node {
 }
 func (n *Node) RightNodes() []Node {
 	rights := []Node{}
-	for _, e := range n.Lefts() {
+	for _, e := range n.Rights() {
 		node := Node{
 			ele:   e,
 			depth: n.depth + 1,

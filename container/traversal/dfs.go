@@ -22,6 +22,9 @@ func TraversalDFS(ele interface{}, filterFn func(ele interface{}, depth int) (go
 
 // isRoot root needs to be filtered first time
 func traversalDFS(current []Node, filterFn func(node Node) (gotoNextLayer bool), processFn func(node Node) (gotoNextLayer bool), isRoot bool) (gotoNextLayer bool) {
+	if len(current) == 0 {
+		return false
+	}
 	// Step 1: brothers
 	for _, node := range current {
 		// filter root

@@ -22,6 +22,9 @@ func TraversalBFS(ele interface{}, filterFn func(ele interface{}, depth int) (go
 
 // isRoot root needs to be filtered first time
 func traversalBFS(current []Node, filterFn func(node Node) (gotoNextLayer bool), processFn func(node Node) (gotoNextLayer bool), isRoot bool) (gotoNextLayer bool) {
+	if len(current) == 0 {
+		return false
+	}
 	// Step 1: brothers layer
 	nextBrothers := []Node{}
 	for _, node := range current {
@@ -43,9 +46,9 @@ func traversalBFS(current []Node, filterFn func(node Node) (gotoNextLayer bool),
 	// filter children
 	for _, node := range nextBrothers {
 		// Scan node for nodes to include.
-		nextChildren = append(nextChildren, filterChildren(node, node.LeftNodes(), processFn)...)
-		nextChildren = append(nextChildren, filterChildren(node, node.MiddleNodes(), processFn)...)
-		nextChildren = append(nextChildren, filterChildren(node, node.RightNodes(), processFn)...)
+		nextChildren = append(nextChildren, filterChildren(node, node.LeftNodes(), filterFn)...)
+		nextChildren = append(nextChildren, filterChildren(node, node.MiddleNodes(), filterFn)...)
+		nextChildren = append(nextChildren, filterChildren(node, node.RightNodes(), filterFn)...)
 	}
 	traversalBFS(nextChildren, filterFn, processFn, false)
 	return true

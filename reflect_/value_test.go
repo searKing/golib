@@ -90,31 +90,29 @@ func TestTypeDumpValueInfoDFS(t *testing.T) {
 	ins := []inputDumpValue{
 		{
 			a:      reflect.ValueOf(nil),
-			expect: `<nil>`,
+			expect: `<invalid Value>`,
 		},
 		{
 			a:      reflect.ValueOf(true),
-			expect: `<bool Value>`,
+			expect: `[bool: true]`,
 		},
 		{
 			a:      reflect.ValueOf(0),
-			expect: `<int Value>`,
+			expect: `[int: 0]`,
 		},
 		{
 			a:      reflect.ValueOf("HelloWorld"),
-			expect: `string`,
+			expect: `[string: HelloWorld]`,
 		},
 		{
 			a: reflect.ValueOf(json.SyntaxError{}),
-			expect: `<json.SyntaxError Value>
-        	
-        	<int64 Value>`,
+			expect: `[json.SyntaxError: {msg: Offset:0}]
+	[string: ]
+	[int64: 0]`,
 		},
 		{
-			a: reflect.ValueOf(nilError),
-			expect: `*json.SyntaxError
-	string
-	int64`,
+			a:      reflect.ValueOf(nilError),
+			expect: `[*json.SyntaxError: <nil>]`,
 		},
 	}
 	for idx, in := range ins {
@@ -130,31 +128,29 @@ func TestTypeDumpValueInfoBFS(t *testing.T) {
 	ins := []inputDumpValue{
 		{
 			a:      reflect.ValueOf(nil),
-			expect: `<nil>`,
+			expect: `<invalid Value>`,
 		},
 		{
 			a:      reflect.ValueOf(true),
-			expect: `bool`,
+			expect: `[bool: true]`,
 		},
 		{
 			a:      reflect.ValueOf(0),
-			expect: `int`,
+			expect: `[int: 0]`,
 		},
 		{
 			a:      reflect.ValueOf(""),
-			expect: `string`,
+			expect: `[string: ]`,
 		},
 		{
 			a: reflect.ValueOf(json.SyntaxError{}),
-			expect: `json.SyntaxError
-	string
-	int64`,
+			expect: `[json.SyntaxError: {msg: Offset:0}]
+	[string: ]
+	[int64: 0]`,
 		},
 		{
-			a: reflect.ValueOf(nilError),
-			expect: `*json.SyntaxError
-	string
-	int64`,
+			a:      reflect.ValueOf(nilError),
+			expect: `[*json.SyntaxError: <nil>]`,
 		},
 	}
 	for idx, in := range ins {
