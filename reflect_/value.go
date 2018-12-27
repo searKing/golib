@@ -62,9 +62,9 @@ func FollowValuePointer(v reflect.Value) reflect.Value {
 
 // A field represents a single field found in a struct.
 type fieldValueInfo struct {
-	val    reflect.Value
-	sf     reflect.StructField
-	deepth int
+	val   reflect.Value
+	sf    reflect.StructField
+	depth int
 }
 
 func (thiz *fieldValueInfo) String() string {
@@ -91,12 +91,12 @@ func WalkValueDFS(val reflect.Value, parseFn func(info fieldValueInfo) (goon boo
 	walkValueDFS(val, 0, visited, parseFn)
 }
 
-func walkValueDFS(val reflect.Value, deepth int, visited map[reflect.Value]bool, parseFn func(info fieldValueInfo) (goon bool)) (goon bool) {
+func walkValueDFS(val reflect.Value, depth int, visited map[reflect.Value]bool, parseFn func(info fieldValueInfo) (goon bool)) (goon bool) {
 	if visited[val] {
 		return true
 	}
 	visited[val] = true
-	if !parseFn(fieldValueInfo{val: val, deepth: deepth}) {
+	if !parseFn(fieldValueInfo{val: val, depth: depth}) {
 		return false
 	}
 	if !val.IsValid() {
@@ -112,7 +112,7 @@ func walkValueDFS(val reflect.Value, deepth int, visited map[reflect.Value]bool,
 	// Scan typ for fields to include.
 	for i := 0; i < val.NumField(); i++ {
 		sf := val.Field(i)
-		if !walkValueDFS(sf, deepth+1, visited, parseFn) {
+		if !walkValueDFS(sf, depth+1, visited, parseFn) {
 			return false
 		}
 	}
@@ -131,7 +131,7 @@ func WalkValueBFS(val reflect.Value, parseFn func(info fieldValueInfo) (goon boo
 	walkValueBFS(fvi, visited, parseFn)
 }
 func walkValueBFS(fvi fieldValueInfo, visited map[reflect.Value]bool, parseFn func(info fieldValueInfo) (goon bool)) (goon bool) {
-	deepth := fvi.deepth
+	depth := fvi.depth
 	if visited[fvi.val] {
 		return true
 	}
@@ -148,7 +148,7 @@ func walkValueBFS(fvi fieldValueInfo, visited map[reflect.Value]bool, parseFn fu
 	// Anonymous fields to explore at the current level and the next.
 	next := []reflect.Value{}
 
-	deepth++
+	depth++
 	// Scan typ for fields to include.
 	for i := 0; i < fvi.val.NumField(); i++ {
 		sfv := fvi.val.Field(i)
@@ -157,14 +157,14 @@ func walkValueBFS(fvi fieldValueInfo, visited map[reflect.Value]bool, parseFn fu
 		}
 		visited[sfv] = true
 
-		if !parseFn(fieldValueInfo{val: sfv, sf: fvi.val.Type().Field(i), deepth: deepth}) {
+		if !parseFn(fieldValueInfo{val: sfv, sf: fvi.val.Type().Field(i), depth: depth}) {
 			return false
 		}
 
 		next = append(next, sfv)
 	}
 	for _, sf := range next {
-		if !walkValueDFS(sf, deepth, visited, parseFn) {
+		if !walkValueDFS(sf, depth, visited, parseFn) {
 			return false
 		}
 	}
@@ -176,9 +176,9 @@ func DumpValueInfoDFS(v reflect.Value) string {
 	WalkValueDFS(v, func(info fieldValueInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
@@ -192,9 +192,9 @@ func DumpValueInfoBFS(v reflect.Value) string {
 	WalkValueBFS(v, func(info fieldValueInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true

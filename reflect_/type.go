@@ -23,8 +23,8 @@ func FollowTypePointer(v reflect.Type) reflect.Type {
 
 // A field represents a single field found in a struct.
 type fieldTypeInfo struct {
-	sf     reflect.StructField
-	deepth int
+	sf    reflect.StructField
+	depth int
 }
 
 func (thiz *fieldTypeInfo) String() string {
@@ -43,13 +43,13 @@ func WalkTypeDFS(typ reflect.Type, parseFn func(info fieldTypeInfo) (goon bool))
 		Type: typ,
 	}, 0, visited, parseFn)
 }
-func walkTypeDFS(sf reflect.StructField, deepth int, visited map[reflect.Type]bool, parseFn func(info fieldTypeInfo) (goon bool)) (goon bool) {
+func walkTypeDFS(sf reflect.StructField, depth int, visited map[reflect.Type]bool, parseFn func(info fieldTypeInfo) (goon bool)) (goon bool) {
 	typ := sf.Type
 	if visited[typ] {
 		return true
 	}
 	visited[typ] = true
-	if !parseFn(fieldTypeInfo{sf: sf, deepth: deepth}) {
+	if !parseFn(fieldTypeInfo{sf: sf, depth: depth}) {
 		return false
 	}
 	typ = FollowTypePointer(typ)
@@ -68,7 +68,7 @@ func walkTypeDFS(sf reflect.StructField, deepth int, visited map[reflect.Type]bo
 		//	// Follow pointer.
 		//	ft = FollowTypePointer(ft)
 		//}
-		if !walkTypeDFS(sf, deepth+1, visited, parseFn) {
+		if !walkTypeDFS(sf, depth+1, visited, parseFn) {
 			return false
 		}
 	}
@@ -84,7 +84,7 @@ func WalkTypeBFS(typ reflect.Type, parseFn func(info fieldTypeInfo) (goon bool))
 		sf: reflect.StructField{
 			Type: typ,
 		},
-		deepth: 0,
+		depth: 0,
 	}
 	if !parseFn(fti) {
 		return
@@ -107,7 +107,7 @@ func walkTypeBFS(fti fieldTypeInfo, visited map[reflect.Type]bool, parseFn func(
 	// Anonymous fields to explore at the current level and the next.
 	next := []reflect.StructField{}
 
-	fti.deepth++
+	fti.depth++
 	// Scan typ for fields to include.
 	for i := 0; i < typ.NumField(); i++ {
 		sf := typ.Field(i)
@@ -122,14 +122,14 @@ func walkTypeBFS(fti fieldTypeInfo, visited map[reflect.Type]bool, parseFn func(
 		}
 		visited[ft] = true
 
-		if !parseFn(fieldTypeInfo{sf: sf, deepth: fti.deepth}) {
+		if !parseFn(fieldTypeInfo{sf: sf, depth: fti.depth}) {
 			return false
 		}
 
 		next = append(next, sf)
 	}
 	for _, sf := range next {
-		if !walkTypeBFS(fieldTypeInfo{sf: sf, deepth: fti.deepth}, visited, parseFn) {
+		if !walkTypeBFS(fieldTypeInfo{sf: sf, depth: fti.depth}, visited, parseFn) {
 			return false
 		}
 	}
@@ -141,9 +141,9 @@ func DumpTypeInfoDFS(t reflect.Type) string {
 	WalkTypeDFS(t, func(info fieldTypeInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
@@ -156,9 +156,9 @@ func DumpTypeInfoBFS(t reflect.Type) string {
 	WalkTypeBFS(t, func(info fieldTypeInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.deepth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
