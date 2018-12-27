@@ -6,6 +6,41 @@ type Node struct {
 	depth int
 }
 
+func (n *Node) LeftNodes() []Node {
+	lefts := []Node{}
+	for _, e := range n.Lefts() {
+		node := Node{
+			ele:   e,
+			depth: n.depth + 1,
+		}
+		lefts = append(lefts, node)
+	}
+	return lefts
+}
+func (n *Node) MiddleNodes() []Node {
+	middles := []Node{}
+	for _, e := range n.Lefts() {
+		node := Node{
+			ele:   e,
+			depth: n.depth + 1,
+		}
+		middles = append(middles, node)
+	}
+	return middles
+}
+func (n *Node) RightNodes() []Node {
+	rights := []Node{}
+	for _, e := range n.Lefts() {
+		node := Node{
+			ele:   e,
+			depth: n.depth + 1,
+		}
+		rights = append(rights, node)
+	}
+	return rights
+}
+
+// children
 func (n *Node) Lefts() []interface{} {
 	if n.ele == nil {
 		return nil

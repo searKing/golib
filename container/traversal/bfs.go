@@ -2,46 +2,51 @@ package traversal
 
 // TODO template in Go2.0 is expected
 // Breadth First Search
-func TraversalBFS(val interface{}, processFn func(ele interface{}, depth int) (gotoNextLayer bool)) {
-	// Nodes already visited at an earlier level.
-	visited := map[interface{}]bool{}
-	traversalBFS(val, 0, visited, processFn)
+func TraversalBFS(ele interface{}, filterFn func(ele interface{}, depth int) (gotoNextLayer bool), processFn func(ele interface{}, depth int) (gotoNextLayer bool)) {
+	traversalBFS([]Node{{
+		ele: ele,
+	}}, func(node Node) (gotoNextLayer bool) {
+		if filterFn == nil {
+			// traversal every node
+			return true
+		}
+		return filterFn(node.ele, node.depth)
+	}, func(node Node) (gotoNextLayer bool) {
+		if processFn == nil {
+			// traversal no node
+			return false
+		}
+		return processFn(node.ele, node.depth)
+	}, true)
 }
 
-func traversalBFS(ele interface{}, depth int, visited map[interface{}]bool, processFn func(ele interface{}, depth int) (gotoNextLayer bool)) (gotoNextLayer bool) {
-	if visited[ele] {
-		return true
-	}
-	visited[ele] = true
-	node := Node{
-		ele:   ele,
-		depth: 0}
-	if !processFn(node.ele, depth) {
-		return false
-	}
-	// Anonymous fields to explore at the current level and the next.
-	next := []interface{}{}
-	// Scan node for nodes to include.
-	for _, e := range node.Lefts() {
-		if !processFn(e, depth) {
-			continue
+// isRoot root needs to be filtered first time
+func traversalBFS(current []Node, filterFn func(node Node) (gotoNextLayer bool), processFn func(node Node) (gotoNextLayer bool), isRoot bool) (gotoNextLayer bool) {
+	// Step 1: brothers layer
+	nextBrothers := []Node{}
+	for _, node := range current {
+		// filter root
+		if isRoot {
+			if !filterFn(node) {
+				return false
+			}
 		}
-		next = append(next, e)
-	}
-	for _, e := range node.Middles() {
-		if !processFn(e, depth) {
-			continue
+		if !processFn(node) {
+			return false
 		}
-		next = append(next, e)
+		// filter brothers
+		nextBrothers = append(nextBrothers, node)
 	}
-	for _, e := range node.Rights() {
-		if !processFn(e, depth) {
-			continue
-		}
-		next = append(next, e)
+
+	// Step 2: children layer
+	nextChildren := []Node{}
+	// filter children
+	for _, node := range nextBrothers {
+		// Scan node for nodes to include.
+		nextChildren = append(nextChildren, filterChildren(node, node.LeftNodes(), processFn)...)
+		nextChildren = append(nextChildren, filterChildren(node, node.MiddleNodes(), processFn)...)
+		nextChildren = append(nextChildren, filterChildren(node, node.RightNodes(), processFn)...)
 	}
-	for _, e := range next {
-		traversalBFS(e, depth, visited, processFn)
-	}
+	traversalBFS(nextChildren, filterFn, processFn, false)
 	return true
 }

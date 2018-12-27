@@ -2,33 +2,41 @@ package traversal
 
 // TODO template in Go2.0 is expected
 // Depth First Search
-func TraversalDFS(val interface{}, processFn func(ele interface{}, depth int) (gotoNextLayer bool)) {
-	// Nodes already visited at an earlier level.
-	visited := map[interface{}]bool{}
-	traversalDFS(val, 0, visited, processFn)
+func TraversalDFS(ele interface{}, filterFn func(ele interface{}, depth int) (gotoNextLayer bool), processFn func(ele interface{}, depth int) (gotoNextLayer bool)) {
+	traversalDFS([]Node{{
+		ele: ele,
+	}}, func(node Node) (gotoNextLayer bool) {
+		if filterFn == nil {
+			// traversal every node
+			return true
+		}
+		return filterFn(node.ele, node.depth)
+	}, func(node Node) (gotoNextLayer bool) {
+		if processFn == nil {
+			// traversal no node
+			return false
+		}
+		return processFn(node.ele, node.depth)
+	}, true)
 }
 
-func traversalDFS(ele interface{}, depth int, visited map[interface{}]bool, processFn func(ele interface{}, depth int) (gotoNextLayer bool)) (gotoNextLayer bool) {
-	if visited[ele] {
-		return true
-	}
-	visited[ele] = true
-	node := Node{
-		ele:   ele,
-		depth: 0}
-	if !processFn(node.ele, depth) {
-		return false
-	}
-
-	// Scan node for nodes to include.
-	for _, e := range node.Lefts() {
-		traversalDFS(e, depth+1, visited, processFn)
-	}
-	for _, e := range node.Middles() {
-		traversalDFS(e, depth+1, visited, processFn)
-	}
-	for _, e := range node.Rights() {
-		traversalDFS(e, depth+1, visited, processFn)
+// isRoot root needs to be filtered first time
+func traversalDFS(current []Node, filterFn func(node Node) (gotoNextLayer bool), processFn func(node Node) (gotoNextLayer bool), isRoot bool) (gotoNextLayer bool) {
+	// Step 1: brothers
+	for _, node := range current {
+		// filter root
+		if isRoot {
+			if !filterFn(node) {
+				return false
+			}
+		}
+		if !processFn(node) {
+			return false
+		}
+		// filter children
+		traversalDFS(filterChildren(node, node.MiddleNodes(), filterFn), filterFn, processFn, false)
+		traversalDFS(filterChildren(node, node.LeftNodes(), filterFn), filterFn, processFn, false)
+		traversalDFS(filterChildren(node, node.RightNodes(), filterFn), filterFn, processFn, false)
 	}
 	return true
 }
