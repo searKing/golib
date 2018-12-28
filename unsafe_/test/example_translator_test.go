@@ -1,7 +1,7 @@
 package unsafetest_test
 
 import (
-	"github.com/searKing/golib/unsafe/test"
+	"github.com/searKing/golib/unsafe_/test"
 )
 
 // The actual test functions are in non-_test.go files

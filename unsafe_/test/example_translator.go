@@ -24,7 +24,7 @@ void showStringArray(char** list, int num){
 import "C"
 import (
 	"fmt"
-	unsafe2 "github.com/searKing/golib/unsafe"
+	"github.com/searKing/golib/unsafe_"
 	"unsafe"
 )
 
@@ -32,13 +32,13 @@ func ExampleGoStringArray() {
 	//char** 转化成 []string
 	cCharArray := C.getStringArray(3)
 	defer C.free(unsafe.Pointer(cCharArray))
-	fmt.Print(unsafe2.GoStringArray(unsafe.Pointer(cCharArray), 3))
+	fmt.Print(unsafe_.GoStringArray(unsafe.Pointer(cCharArray), 3))
 
 }
 func ExampleCStringArray() {
 	//[]string 转化成 char**
 	box := []string{"xing", "jack", "john", "searKing"}
-	cCharArray, n := unsafe2.CStringArray(box...)
+	cCharArray, n := unsafe_.CStringArray(box...)
 	defer C.free(unsafe.Pointer(cCharArray))
 	C.showStringArray((**C.char)(unsafe.Pointer(cCharArray)), C.int(n))
 }
