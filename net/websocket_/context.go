@@ -1,4 +1,4 @@
-package websocket
+package websocket_
 
 var (
 	// ServerContextKey is a context key. It can be used in Websocket
