@@ -1,4 +1,4 @@
-package urlutil
+package url_
 
 import (
 	"golang.org/x/net/idna"

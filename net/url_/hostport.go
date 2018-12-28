@@ -1,4 +1,4 @@
-package urlutil
+package url_
 
 import (
 	"errors"

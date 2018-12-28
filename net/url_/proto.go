@@ -1,4 +1,4 @@
-package urlutil
+package url_
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ type Proto struct {
 
 func ParseProto(rawproto string) (*Proto, error) {
 	if rawproto == "" {
-		return nil, errors.New("empty urlutil")
+		return nil, errors.New("empty url_")
 	}
 	proto := new(Proto)
 	var protoType string

@@ -4,7 +4,7 @@ package ice
 
 import (
 	"fmt"
-	"github.com/searKing/golib/net/urlutil"
+	"github.com/searKing/golib/net/url_"
 	"net"
 	"strconv"
 )
@@ -21,7 +21,7 @@ type URL struct {
 // https://tools.ietf.org/html/rfc7064 and https://tools.ietf.org/html/rfc7065
 // respectively.
 func ParseURL(raw string) (*URL, error) {
-	standardUrl, host, port, err := urlutil.ParseURL(raw, getDefaultPort)
+	standardUrl, host, port, err := url_.ParseURL(raw, getDefaultPort)
 	if err != nil {
 		return nil, err
 	}

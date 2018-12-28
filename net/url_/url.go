@@ -1,4 +1,4 @@
-package urlutil
+package url_
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 
 func ParseStandardURL(rawUrl string) (*url.URL, error) {
 
-	u, err := url.Parse(rawUrl) // Just urlutil.Parse (urlutil is shadowed for godoc).
+	u, err := url.Parse(rawUrl) // Just url_.Parse (url_ is shadowed for godoc).
 	if err != nil {
 		return nil, err
 	}
