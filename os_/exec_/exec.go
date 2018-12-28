@@ -7,14 +7,14 @@ import (
 	"os/exec"
 )
 
-type commandSercer struct {
+type commandServer struct {
 	cmd    *exec.Cmd
 	handle func(reader io.Reader)
 	ctx    context.Context
 	done   context.CancelFunc
 }
 
-func newCommandServer(parent context.Context, stop context.CancelFunc, handle func(reader io.Reader), name string, args ...string) (*commandSercer, error) {
+func newCommandServer(parent context.Context, stop context.CancelFunc, handle func(reader io.Reader), name string, args ...string) (*commandServer, error) {
 	if parent == nil {
 		parent = context.Background()
 	}
@@ -25,7 +25,7 @@ func newCommandServer(parent context.Context, stop context.CancelFunc, handle fu
 		handle = func(reader io.Reader) {}
 	}
 
-	cs := &commandSercer{
+	cs := &commandServer{
 		cmd:    exec.Command(name, args...),
 		handle: handle,
 		ctx:    parent,
@@ -41,7 +41,7 @@ func newCommandServer(parent context.Context, stop context.CancelFunc, handle fu
 	return cs, nil
 }
 
-func (cs *commandSercer) wait() error {
+func (cs *commandServer) wait() error {
 	select {
 	case <-cs.ctx.Done():
 		return cs.ctx.Err()
@@ -49,12 +49,12 @@ func (cs *commandSercer) wait() error {
 	return nil
 }
 
-func (cs *commandSercer) watch(r io.Reader) {
+func (cs *commandServer) watch(r io.Reader) {
 	cs.handle(r)
 	cs.cmd.Wait()
 	cs.done()
 }
-func (cs *commandSercer) Stop() {
+func (cs *commandServer) Stop() {
 	cs.cmd.Process.Signal(os.Interrupt)
 	cs.done()
 }

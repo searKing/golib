@@ -34,7 +34,7 @@ func CommandWithTimeout(handle func(io.Reader), timeout time.Duration, name stri
 	}
 	return nil
 }
-func newCommandServerWithTimeout(handle func(io.Reader), timeout time.Duration, name string, args ...string) (*commandSercer, error) {
+func newCommandServerWithTimeout(handle func(io.Reader), timeout time.Duration, name string, args ...string) (*commandServer, error) {
 	ctx, stop := context.WithTimeout(context.Background(), timeout)
 	return newCommandServer(ctx, stop, handle, name, args...)
 }
