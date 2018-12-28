@@ -2,7 +2,7 @@ package tcp
 
 import (
 	"context"
-	"github.com/searKing/golib/time/delay"
+	"github.com/searKing/golib/time_/delay"
 	"github.com/searKing/golib/util/object"
 	"go.uber.org/atomic"
 	"io"
