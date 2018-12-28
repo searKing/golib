@@ -1,4 +1,4 @@
-package bufio
+package bufio_
 
 import (
 	"bufio"
