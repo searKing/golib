@@ -2,7 +2,7 @@ package tcp
 
 import (
 	"context"
-	"github.com/searKing/golib/time_/delay"
+	"github.com/searKing/golib/time_"
 	"github.com/searKing/golib/util/object"
 	"go.uber.org/atomic"
 	"io"
@@ -94,7 +94,7 @@ func (srv *Server) Serve(l net.Listener) error {
 	l = &onceCloseListener{Listener: l}
 	defer l.Close()
 
-	var tempDelay = delay.NewDefaultDelay() // how long to sleep on accept failure
+	var tempDelay = time_.NewDefaultDelay() // how long to sleep on accept failure
 	ctx := context.WithValue(context.Background(), ServerContextKey, srv)
 	for {
 		rw, e := l.Accept()

@@ -1,4 +1,4 @@
-package delay
+package time_
 
 import "time"
 
