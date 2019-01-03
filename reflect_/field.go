@@ -51,10 +51,10 @@ type field struct {
 //
 //			// Scan f.typ for fields to include.
 //			for i := 0; i < f.typ.NumField(); i++ {
-//				sf := f.typ.Field(i)
-//				isUnexported := sf.PkgPath != ""
-//				if sf.Anonymous {
-//					t := sf.Type
+//				StructField := f.typ.Field(i)
+//				isUnexported := StructField.PkgPath != ""
+//				if StructField.Anonymous {
+//					t := StructField.Type
 //					if t.Kind() == reflect.Ptr {
 //						t = t.Elem()
 //					}
@@ -68,24 +68,24 @@ type field struct {
 //					// Ignore unexported non-embedded fields.
 //					continue
 //				}
-//				if parseTag(sf.Tag) {
+//				if parseTag(StructField.Tag) {
 //					continue
 //				}
 //				index := make([]int, len(f.index)+1)
 //				copy(index, f.index)
 //				index[len(f.index)] = i
 //
-//				ft := sf.Type
+//				ft := StructField.Type
 //				if ft.Name() == "" && ft.Kind() == reflect.Ptr {
 //					// Follow pointer.
 //					ft = ft.Elem()
 //				}
 //
 //				// Record found field and index sequence.
-//				if name != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
+//				if name != "" || !StructField.Anonymous || ft.Kind() != reflect.Struct {
 //					tagged := name != ""
 //					if name == "" {
-//						name = sf.Name
+//						name = StructField.Name
 //					}
 //					fields = append(fields, fillField(field{
 //						name:      name,
@@ -116,7 +116,7 @@ type field struct {
 //
 //	sort.Slice(fields, func(i, j int) bool {
 //		x := fields
-//		// sort field by name, breaking ties with depth, then
+//		// sort field by name, breaking ties with Depth, then
 //		// breaking ties with "name came from json tag", then
 //		// breaking ties with index sequence.
 //		if x[i].name != x[j].name {
@@ -170,11 +170,11 @@ type field struct {
 //	f.equalFold = foldFunc(f.nameBytes)
 //	return f
 //}
-//func parseStructField(sf reflect.StructField) (stop bool) {
+//func parseStructField(StructField reflect.StructField) (stop bool) {
 //
-//	isUnexported := sf.PkgPath != ""
-//	if sf.Anonymous {
-//		t := sf.Type
+//	isUnexported := StructField.PkgPath != ""
+//	if StructField.Anonymous {
+//		t := StructField.Type
 //		if t.Kind() == reflect.Ptr {
 //			t = t.Elem()
 //		}
@@ -189,10 +189,10 @@ type field struct {
 //		return false
 //	}
 //	// Record found field and index sequence.
-//	if name != "" || !sf.Anonymous || ft.Kind() != reflect.Struct {
+//	if name != "" || !StructField.Anonymous || ft.Kind() != reflect.Struct {
 //		tagged := name != ""
 //		if name == "" {
-//			name = sf.Name
+//			name = StructField.Name
 //		}
 //		fields = append(fields, fillField(field{
 //			name:      name,
@@ -214,7 +214,7 @@ type field struct {
 //
 //}
 
-//func workFields(t reflect.Type, do func(sf reflect.StructField) (stop bool)) {
+//func workFields(t reflect.Type, do func(StructField reflect.StructField) (stop bool)) {
 //	// Anonymous fields to explore at the current level and the next.
 //	current := []field{}
 //	next := []field{{typ: t}}
@@ -245,15 +245,15 @@ type field struct {
 //			}
 //			// Scan f.typ for fields to include.
 //			for i := 0; i < f.typ.NumField(); i++ {
-//				sf := f.typ.Field(i)
-//				if do(sf) {
+//				StructField := f.typ.Field(i)
+//				if do(StructField) {
 //					continue
 //				}
 //				index := make([]int, len(f.index)+1)
 //				copy(index, f.index)
 //				index[len(f.index)] = i
 //
-//				ft := sf.Type
+//				ft := StructField.Type
 //				if ft.Name() == "" && ft.Kind() == reflect.Ptr {
 //					// Follow pointer.
 //					ft = ft.Elem()

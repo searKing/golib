@@ -27,7 +27,7 @@ func TestWalkStruct(t *testing.T) {
 	}
 
 	Walk(reflect.TypeOf(input{}), true, func(s reflect.Type, sf reflect.StructField) (stop bool) {
-		t.Logf("typ:%v sf:%v", s, sf)
+		t.Logf("typ:%v StructField:%v", s, sf)
 		return false
 	})
 }
@@ -39,7 +39,7 @@ func TestWalkBool(t *testing.T) {
 		t.Logf("typ of a == typ of b")
 	}
 	Walk(reflect.TypeOf(bool(false)), false, func(s reflect.Type, sf reflect.StructField) (stop bool) {
-		t.Logf("typ:%v sf:%v", s, sf)
+		t.Logf("typ:%v StructField:%v", s, sf)
 		return false
 	})
 }

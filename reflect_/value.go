@@ -28,6 +28,7 @@ func IsEmptyValue(v reflect.Value) bool {
 	}
 	return false
 }
+
 func IsZeroValue(v reflect.Value) bool {
 	if !v.IsValid() {
 		return true
@@ -63,21 +64,22 @@ func FollowValuePointer(v reflect.Value) reflect.Value {
 }
 
 // A field represents a single field found in a struct.
-type fieldValueInfo struct {
-	val   reflect.Value
-	sf    reflect.StructField
-	depth int
+type FieldValueInfo struct {
+	Value       reflect.Value
+	StructField reflect.StructField
+	Depth       int
+	Index       []int
 }
 
-func (thiz fieldValueInfo) Middles() []interface{} {
+func (thiz FieldValueInfo) Middles() []interface{} {
 
-	if !thiz.val.IsValid() {
+	if !thiz.Value.IsValid() {
 		return nil
 	}
-	if IsNilType(thiz.val.Type()) {
+	if IsNilType(thiz.Value.Type()) {
 		return nil
 	}
-	val := FollowValuePointer(thiz.val)
+	val := FollowValuePointer(thiz.Value)
 	if val.Kind() != reflect.Struct {
 		return nil
 	}
@@ -85,57 +87,58 @@ func (thiz fieldValueInfo) Middles() []interface{} {
 	middles := []interface{}{}
 	// Scan typ for fields to include.
 	for i := 0; i < val.NumField(); i++ {
-		middles = append(middles, fieldValueInfo{
-			val:   val.Field(i),
-			sf:    val.Type().Field(i),
-			depth: thiz.depth + 1,
+		middles = append(middles, FieldValueInfo{
+			Value:       val.Field(i),
+			StructField: val.Type().Field(i),
+			Depth:       thiz.Depth + 1,
+			Index:       append(thiz.Index, i),
 		})
 	}
 	return middles
 }
 
-func (thiz *fieldValueInfo) String() string {
-	//if IsNilValue(thiz.val) {
+func (thiz *FieldValueInfo) String() string {
+	//if IsNilValue(thiz.Value) {
 	//	return fmt.Sprintf("%+v", nil)
 	//}
-	//thiz.val.String()
-	//return fmt.Sprintf("%+v %+v", thiz.val.Type().String(), thiz.val)
+	//thiz.Value.String()
+	//return fmt.Sprintf("%+v %+v", thiz.Value.Type().String(), thiz.Value)
 
-	switch k := thiz.val.Kind(); k {
+	switch k := thiz.Value.Kind(); k {
 	case reflect.Invalid:
 		return "<invalid Value>"
 	case reflect.String:
-		return "[string: " + thiz.val.String() + "]"
+		return "[string: " + thiz.Value.String() + "]"
 	}
 	// If you call String on a reflect.Value of other type, it's better to
 	// print something than to panic. Useful in debugging.
-	return "[" + thiz.val.Type().String() + ":" + fmt.Sprintf(" %+v", thiz.val) + "]"
+	return "[" + thiz.Value.Type().String() + ":" + fmt.Sprintf(" %+v", thiz.Value) + "]"
 }
-func WalkValueDFS(val reflect.Value, parseFn func(info fieldValueInfo) (goon bool)) {
-	traversal.TraversalBFS(fieldValueInfo{
-		val: val,
+func WalkValueDFS(val reflect.Value, parseFn func(info FieldValueInfo) (goon bool)) {
+	traversal.TraversalBFS(FieldValueInfo{
+		Value: val,
 	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
-		return parseFn(ele.(fieldValueInfo))
+		return parseFn(ele.(FieldValueInfo))
 	})
 }
 
 // Breadth First Search
-func WalkValueBFS(val reflect.Value, parseFn func(info fieldValueInfo) (goon bool)) {
-	traversal.TraversalBFS(fieldValueInfo{val: val},
+func WalkValueBFS(val reflect.Value, parseFn func(info FieldValueInfo) (goon bool)) {
+	traversal.TraversalBFS(FieldValueInfo{Value: val},
 		nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
-			return parseFn(ele.(fieldValueInfo))
+			return parseFn(ele.(FieldValueInfo))
 		})
 }
 
 func DumpValueInfoDFS(v reflect.Value) string {
 	dumpInfo := &bytes.Buffer{}
 	first := true
-	WalkValueDFS(v, func(info fieldValueInfo) (goon bool) {
+	WalkValueDFS(v, func(info FieldValueInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
@@ -146,12 +149,12 @@ func DumpValueInfoDFS(v reflect.Value) string {
 func DumpValueInfoBFS(v reflect.Value) string {
 	dumpInfo := &bytes.Buffer{}
 	first := true
-	WalkValueBFS(v, func(info fieldValueInfo) (goon bool) {
+	WalkValueBFS(v, func(info FieldValueInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true

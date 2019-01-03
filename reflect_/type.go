@@ -23,13 +23,14 @@ func FollowTypePointer(v reflect.Type) reflect.Type {
 }
 
 // A field represents a single field found in a struct.
-type fieldTypeInfo struct {
-	sf    reflect.StructField
-	depth int
+type FieldTypeInfo struct {
+	StructField reflect.StructField
+	Depth       int
+	Index       []int
 }
 
-func (thiz fieldTypeInfo) Middles() []interface{} {
-	typ := thiz.sf.Type
+func (thiz FieldTypeInfo) Middles() []interface{} {
+	typ := thiz.StructField.Type
 	middles := []interface{}{}
 	typ = FollowTypePointer(typ)
 	if IsNilType(typ) {
@@ -41,53 +42,52 @@ func (thiz fieldTypeInfo) Middles() []interface{} {
 	// Scan typ for fields to include.
 	for i := 0; i < typ.NumField(); i++ {
 		sf := typ.Field(i)
-		middles = append(middles, fieldTypeInfo{
-			sf:    sf,
-			depth: thiz.depth + 1,
+		middles = append(middles, FieldTypeInfo{
+			StructField: sf,
+			Depth:       thiz.Depth + 1,
+			Index:       append(thiz.Index, i),
 		})
 	}
 	return middles
 }
 
-func (thiz fieldTypeInfo) String() string {
-	if thiz.sf.Type == nil {
+func (thiz FieldTypeInfo) String() string {
+	if thiz.StructField.Type == nil {
 		return fmt.Sprintf("%+v", nil)
 	}
-	return fmt.Sprintf("%+v", thiz.sf.Type.String())
+	return fmt.Sprintf("%+v", thiz.StructField.Type.String())
 }
 
 // Breadth First Search
-func WalkTypeBFS(typ reflect.Type, parseFn func(info fieldTypeInfo) (goon bool)) {
-	traversal.TraversalBFS(fieldTypeInfo{
-		sf: reflect.StructField{
+func WalkTypeBFS(typ reflect.Type, parseFn func(info FieldTypeInfo) (goon bool)) {
+	traversal.TraversalBFS(FieldTypeInfo{
+		StructField: reflect.StructField{
 			Type: typ,
 		},
-		depth: 0,
 	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
-		return parseFn(ele.(fieldTypeInfo))
+		return parseFn(ele.(FieldTypeInfo))
 	})
 }
 
 // Wid First Search
-func WalkTypeDFS(typ reflect.Type, parseFn func(info fieldTypeInfo) (goon bool)) {
-	traversal.TraversalDFS(fieldTypeInfo{
-		sf: reflect.StructField{
+func WalkTypeDFS(typ reflect.Type, parseFn func(info FieldTypeInfo) (goon bool)) {
+	traversal.TraversalDFS(FieldTypeInfo{
+		StructField: reflect.StructField{
 			Type: typ,
 		},
-		depth: 0,
 	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
-		return parseFn(ele.(fieldTypeInfo))
+		return parseFn(ele.(FieldTypeInfo))
 	})
 }
 func DumpTypeInfoDFS(t reflect.Type) string {
 	dumpInfo := &bytes.Buffer{}
 	first := true
-	WalkTypeDFS(t, func(info fieldTypeInfo) (goon bool) {
+	WalkTypeDFS(t, func(info FieldTypeInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
@@ -97,12 +97,12 @@ func DumpTypeInfoDFS(t reflect.Type) string {
 func DumpTypeInfoBFS(t reflect.Type) string {
 	dumpInfo := &bytes.Buffer{}
 	first := true
-	WalkTypeBFS(t, func(info fieldTypeInfo) (goon bool) {
+	WalkTypeBFS(t, func(info FieldTypeInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
