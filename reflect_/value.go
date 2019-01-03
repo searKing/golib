@@ -55,8 +55,9 @@ func IsNilValue(v reflect.Value) (result bool) {
 }
 
 func FollowValuePointer(v reflect.Value) reflect.Value {
+	v = reflect.Indirect(v)
 	if v.Kind() == reflect.Ptr {
-		return FollowValuePointer(v.Elem())
+		return FollowValuePointer(v)
 	}
 	return v
 }
@@ -76,7 +77,6 @@ func (thiz fieldValueInfo) Middles() []interface{} {
 	if IsNilType(thiz.val.Type()) {
 		return nil
 	}
-	typ := FollowTypePointer(thiz.val.Type())
 	val := FollowValuePointer(thiz.val)
 	if val.Kind() != reflect.Struct {
 		return nil
@@ -87,7 +87,7 @@ func (thiz fieldValueInfo) Middles() []interface{} {
 	for i := 0; i < val.NumField(); i++ {
 		middles = append(middles, fieldValueInfo{
 			val:   val.Field(i),
-			sf:    typ.Field(i),
+			sf:    val.Type().Field(i),
 			depth: thiz.depth + 1,
 		})
 	}

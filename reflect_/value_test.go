@@ -2,6 +2,7 @@ package reflect_
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -159,4 +160,14 @@ func TestTypeDumpValueInfoBFS(t *testing.T) {
 			t.Errorf("#%d expect\n[\n%s\n]\nactual[\n%s\n]", idx, in.expect, info)
 		}
 	}
+}
+
+func TestDumpValueInfoBFS(t *testing.T) {
+	str := "HelloWorld"
+	s := &str
+	ss := &s
+	valueS := reflect.ValueOf(ss)
+	indirectValueS := reflect.Indirect(valueS)
+	fmt.Printf("valueS: %s\n", valueS.Kind().String())
+	fmt.Printf("indirect valueS: %s\n", indirectValueS.Kind().String())
 }
