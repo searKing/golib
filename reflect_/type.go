@@ -25,7 +25,6 @@ func FollowTypePointer(v reflect.Type) reflect.Type {
 // A field represents a single field found in a struct.
 type FieldTypeInfo struct {
 	StructField reflect.StructField
-	Depth       int
 	Index       []int
 }
 
@@ -41,16 +40,20 @@ func (thiz FieldTypeInfo) Middles() []interface{} {
 	}
 	// Scan typ for fields to include.
 	for i := 0; i < typ.NumField(); i++ {
+		index := make([]int, len(thiz.Index)+1)
+		copy(index, thiz.Index)
+		index[len(thiz.Index)] = i
 		sf := typ.Field(i)
 		middles = append(middles, FieldTypeInfo{
 			StructField: sf,
-			Depth:       thiz.Depth + 1,
-			Index:       append(thiz.Index, i),
+			Index:       index,
 		})
 	}
 	return middles
 }
-
+func (thiz FieldTypeInfo) Depth() int {
+	return len(thiz.Index)
+}
 func (thiz FieldTypeInfo) String() string {
 	if thiz.StructField.Type == nil {
 		return fmt.Sprintf("%+v", nil)
@@ -85,9 +88,9 @@ func DumpTypeInfoDFS(t reflect.Type) string {
 	WalkTypeDFS(t, func(info FieldTypeInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth())
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth())
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
@@ -100,9 +103,9 @@ func DumpTypeInfoBFS(t reflect.Type) string {
 	WalkTypeBFS(t, func(info FieldTypeInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth())
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth())
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true

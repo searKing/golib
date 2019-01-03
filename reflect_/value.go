@@ -67,7 +67,6 @@ func FollowValuePointer(v reflect.Value) reflect.Value {
 type FieldValueInfo struct {
 	Value       reflect.Value
 	StructField reflect.StructField
-	Depth       int
 	Index       []int
 }
 
@@ -87,14 +86,19 @@ func (thiz FieldValueInfo) Middles() []interface{} {
 	middles := []interface{}{}
 	// Scan typ for fields to include.
 	for i := 0; i < val.NumField(); i++ {
+		index := make([]int, len(thiz.Index)+1)
+		copy(index, thiz.Index)
+		index[len(thiz.Index)] = i
 		middles = append(middles, FieldValueInfo{
 			Value:       val.Field(i),
 			StructField: val.Type().Field(i),
-			Depth:       thiz.Depth + 1,
-			Index:       append(thiz.Index, i),
+			Index:       index,
 		})
 	}
 	return middles
+}
+func (thiz FieldValueInfo) Depth() int {
+	return len(thiz.Index)
 }
 
 func (thiz *FieldValueInfo) String() string {
@@ -136,9 +140,9 @@ func DumpValueInfoDFS(v reflect.Value) string {
 	WalkValueDFS(v, func(info FieldValueInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth())
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth())
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
@@ -152,9 +156,9 @@ func DumpValueInfoBFS(v reflect.Value) string {
 	WalkValueBFS(v, func(info FieldValueInfo) (goon bool) {
 		if first {
 			first = false
-			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewIndent(dumpInfo, "", "\t", info.Depth())
 		} else {
-			bytes_.NewLine(dumpInfo, "", "\t", info.Depth)
+			bytes_.NewLine(dumpInfo, "", "\t", info.Depth())
 		}
 		dumpInfo.WriteString(fmt.Sprintf("%+v", info.String()))
 		return true
