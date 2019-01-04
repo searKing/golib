@@ -29,10 +29,7 @@ func (se *structConverter) convert(e *convertState, v reflect.Value, opts convOp
 			continue
 		}
 		if se.fields[i].tag {
-			kind := v.Kind()
 			field := v.FieldByIndex(se.fields[i].index)
-			kind = field.Type().Kind()
-			_ = kind
 			//判断是否为可取指，可导出字段
 			if !field.CanAddr() || !field.CanInterface() {
 				continue

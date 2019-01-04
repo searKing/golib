@@ -51,22 +51,21 @@ func cachedTypeFields(t reflect.Type) []field {
 		if reflect_.IsEmptyValue(reflect.ValueOf(sf)) {
 			return true
 		}
+		if info.Depth() == 0 {
+			return true
+		}
 		// Handle Tag
-		tag := sf.Tag.Get("default")
-		if tag == "" {
-			return true
-		}
-		if strings.TrimSpace(tag) == "-" {
-			return true
-		}
-		kind := sf.Type.Kind()
-		if kind == reflect.Slice ||
-			kind == reflect.Map ||
-			kind == reflect.Array {
-			if tag[0] == '[' || tag[0] == '{' {
-				defaultValue, err := bufio_.NewPairScanner(strings.NewReader(tag)).SetDiscardLeading(true).ScanDelimiters("{}[]")
-				if err == nil {
-					tag = string(defaultValue)
+		tag, ok := sf.Tag.Lookup("default")
+		if ok {
+			kind := sf.Type.Kind()
+			if kind == reflect.Slice ||
+				kind == reflect.Map ||
+				kind == reflect.Array {
+				if tag[0] == '[' || tag[0] == '{' {
+					defaultValue, err := bufio_.NewPairScanner(strings.NewReader(tag)).SetDiscardLeading(true).ScanDelimiters("{}[]")
+					if err == nil {
+						tag = string(defaultValue)
+					}
 				}
 			}
 		}
@@ -75,7 +74,7 @@ func cachedTypeFields(t reflect.Type) []field {
 			name:  sf.Name,
 			value: tag,
 			index: info.Index,
-			tag:   true,
+			tag:   ok,
 			typ:   sf.Type,
 		})
 		return true
