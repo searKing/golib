@@ -2,6 +2,7 @@ package default_
 
 import "reflect"
 
+// If CanAddr then get addr and convert else convert directly
 type condAddrConverter struct {
 	canAddrConvert, elseConvert convertFunc
 }
