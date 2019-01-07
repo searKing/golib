@@ -10,7 +10,7 @@ type (
 	Element struct {
 		// The Key stored with this element.
 		Key byte
-		// The Value stored with this element.
+		// The value stored with this element.
 		Value interface{}
 
 		left, middle, right *Element

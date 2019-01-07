@@ -52,10 +52,11 @@ func cachedTypeFields(t reflect.Type) []field {
 			return true
 		}
 
-		sf := info.StructField
-		if reflect_.IsEmptyValue(reflect.ValueOf(sf)) {
+		sf, ok := info.StructField()
+		if !ok {
 			return true
 		}
+
 		// Handle Tag
 		tag, ok := sf.Tag.Lookup("default")
 		if ok {
@@ -75,7 +76,7 @@ func cachedTypeFields(t reflect.Type) []field {
 		fields = append(fields, field{
 			name:  sf.Name,
 			value: tag,
-			index: info.Index,
+			index: info.Index(),
 			tag:   ok,
 			typ:   sf.Type,
 		})

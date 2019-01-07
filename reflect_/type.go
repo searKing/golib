@@ -24,12 +24,12 @@ func FollowTypePointer(v reflect.Type) reflect.Type {
 
 // A field represents a single field found in a struct.
 type FieldTypeInfo struct {
-	StructField reflect.StructField
-	Index       []int
+	structField reflect.StructField
+	index       []int
 }
 
 func (thiz FieldTypeInfo) Middles() []interface{} {
-	typ := thiz.StructField.Type
+	typ := thiz.structField.Type
 	middles := []interface{}{}
 	typ = FollowTypePointer(typ)
 	if IsNilType(typ) {
@@ -40,31 +40,44 @@ func (thiz FieldTypeInfo) Middles() []interface{} {
 	}
 	// Scan typ for fields to include.
 	for i := 0; i < typ.NumField(); i++ {
-		index := make([]int, len(thiz.Index)+1)
-		copy(index, thiz.Index)
-		index[len(thiz.Index)] = i
+		index := make([]int, len(thiz.index)+1)
+		copy(index, thiz.index)
+		index[len(thiz.index)] = i
 		sf := typ.Field(i)
 		middles = append(middles, FieldTypeInfo{
-			StructField: sf,
-			Index:       index,
+			structField: sf,
+			index:       index,
 		})
 	}
 	return middles
 }
+
 func (thiz FieldTypeInfo) Depth() int {
-	return len(thiz.Index)
+	return len(thiz.index)
 }
+
+func (thiz FieldTypeInfo) StructField() (reflect.StructField, bool) {
+	if IsEmptyValue(reflect.ValueOf(thiz.structField)) {
+		return thiz.structField, false
+	}
+	return thiz.structField, true
+}
+
+func (thiz FieldTypeInfo) Index() []int {
+	return thiz.index
+}
+
 func (thiz FieldTypeInfo) String() string {
-	if thiz.StructField.Type == nil {
+	if thiz.structField.Type == nil {
 		return fmt.Sprintf("%+v", nil)
 	}
-	return fmt.Sprintf("%+v", thiz.StructField.Type.String())
+	return fmt.Sprintf("%+v", thiz.structField.Type.String())
 }
 
 // Breadth First Search
 func WalkTypeBFS(typ reflect.Type, parseFn func(info FieldTypeInfo) (goon bool)) {
 	traversal.TraversalBFS(FieldTypeInfo{
-		StructField: reflect.StructField{
+		structField: reflect.StructField{
 			Type: typ,
 		},
 	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
@@ -75,7 +88,7 @@ func WalkTypeBFS(typ reflect.Type, parseFn func(info FieldTypeInfo) (goon bool))
 // Wid First Search
 func WalkTypeDFS(typ reflect.Type, parseFn func(info FieldTypeInfo) (goon bool)) {
 	traversal.TraversalDFS(FieldTypeInfo{
-		StructField: reflect.StructField{
+		structField: reflect.StructField{
 			Type: typ,
 		},
 	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {

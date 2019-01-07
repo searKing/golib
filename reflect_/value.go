@@ -64,20 +64,20 @@ func FollowValuePointer(v reflect.Value) reflect.Value {
 
 // A field represents a single field found in a struct.
 type FieldValueInfo struct {
-	Value       reflect.Value
-	StructField reflect.StructField
-	Index       []int
+	value       reflect.Value
+	structField reflect.StructField
+	index       []int
 }
 
 func (thiz FieldValueInfo) Middles() []interface{} {
 
-	if !thiz.Value.IsValid() {
+	if !thiz.value.IsValid() {
 		return nil
 	}
-	if IsNilType(thiz.Value.Type()) {
+	if IsNilType(thiz.value.Type()) {
 		return nil
 	}
-	val := FollowValuePointer(thiz.Value)
+	val := FollowValuePointer(thiz.value)
 	if val.Kind() != reflect.Struct {
 		return nil
 	}
@@ -85,41 +85,56 @@ func (thiz FieldValueInfo) Middles() []interface{} {
 	middles := []interface{}{}
 	// Scan typ for fields to include.
 	for i := 0; i < val.NumField(); i++ {
-		index := make([]int, len(thiz.Index)+1)
-		copy(index, thiz.Index)
-		index[len(thiz.Index)] = i
+		index := make([]int, len(thiz.index)+1)
+		copy(index, thiz.index)
+		index[len(thiz.index)] = i
 		middles = append(middles, FieldValueInfo{
-			Value:       val.Field(i),
-			StructField: val.Type().Field(i),
-			Index:       index,
+			value:       val.Field(i),
+			structField: val.Type().Field(i),
+			index:       index,
 		})
 	}
 	return middles
 }
 func (thiz FieldValueInfo) Depth() int {
-	return len(thiz.Index)
+	return len(thiz.index)
+}
+
+func (thiz FieldValueInfo) Value() reflect.Value {
+	return thiz.value
+}
+
+func (thiz FieldValueInfo) StructField() (reflect.StructField, bool) {
+	if IsEmptyValue(reflect.ValueOf(thiz.structField)) {
+		return thiz.structField, false
+	}
+	return thiz.structField, true
+}
+
+func (thiz FieldValueInfo) Index() []int {
+	return thiz.index
 }
 
 func (thiz *FieldValueInfo) String() string {
-	//if IsNilValue(thiz.Value) {
+	//if IsNilValue(thiz.value) {
 	//	return fmt.Sprintf("%+v", nil)
 	//}
-	//thiz.Value.String()
-	//return fmt.Sprintf("%+v %+v", thiz.Value.Type().String(), thiz.Value)
+	//thiz.value.String()
+	//return fmt.Sprintf("%+v %+v", thiz.value.Type().String(), thiz.value)
 
-	switch k := thiz.Value.Kind(); k {
+	switch k := thiz.value.Kind(); k {
 	case reflect.Invalid:
-		return "<invalid Value>"
+		return "<invalid value>"
 	case reflect.String:
-		return "[string: " + thiz.Value.String() + "]"
+		return "[string: " + thiz.value.String() + "]"
 	}
-	// If you call String on a reflect.Value of other type, it's better to
+	// If you call String on a reflect.value of other type, it's better to
 	// print something than to panic. Useful in debugging.
-	return "[" + thiz.Value.Type().String() + ":" + fmt.Sprintf(" %+v", thiz.Value) + "]"
+	return "[" + thiz.value.Type().String() + ":" + fmt.Sprintf(" %+v", thiz.value) + "]"
 }
 func WalkValueDFS(val reflect.Value, parseFn func(info FieldValueInfo) (goon bool)) {
 	traversal.TraversalBFS(FieldValueInfo{
-		Value: val,
+		value: val,
 	}, nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
 		return parseFn(ele.(FieldValueInfo))
 	})
@@ -127,7 +142,7 @@ func WalkValueDFS(val reflect.Value, parseFn func(info FieldValueInfo) (goon boo
 
 // Breadth First Search
 func WalkValueBFS(val reflect.Value, parseFn func(info FieldValueInfo) (goon bool)) {
-	traversal.TraversalBFS(FieldValueInfo{Value: val},
+	traversal.TraversalBFS(FieldValueInfo{value: val},
 		nil, func(ele interface{}, depth int) (gotoNextLayer bool) {
 			return parseFn(ele.(FieldValueInfo))
 		})

@@ -51,10 +51,10 @@ type field struct {
 //
 //			// Scan f.typ for fields to include.
 //			for i := 0; i < f.typ.NumField(); i++ {
-//				StructField := f.typ.Field(i)
-//				isUnexported := StructField.PkgPath != ""
-//				if StructField.Anonymous {
-//					t := StructField.Type
+//				structField := f.typ.Field(i)
+//				isUnexported := structField.PkgPath != ""
+//				if structField.Anonymous {
+//					t := structField.Type
 //					if t.Kind() == reflect.Ptr {
 //						t = t.Elem()
 //					}
@@ -68,24 +68,24 @@ type field struct {
 //					// Ignore unexported non-embedded fields.
 //					continue
 //				}
-//				if parseTag(StructField.Tag) {
+//				if parseTag(structField.Tag) {
 //					continue
 //				}
 //				index := make([]int, len(f.index)+1)
 //				copy(index, f.index)
 //				index[len(f.index)] = i
 //
-//				ft := StructField.Type
+//				ft := structField.Type
 //				if ft.Name() == "" && ft.Kind() == reflect.Ptr {
 //					// Follow pointer.
 //					ft = ft.Elem()
 //				}
 //
 //				// Record found field and index sequence.
-//				if name != "" || !StructField.Anonymous || ft.Kind() != reflect.Struct {
+//				if name != "" || !structField.Anonymous || ft.Kind() != reflect.Struct {
 //					tagged := name != ""
 //					if name == "" {
-//						name = StructField.Name
+//						name = structField.Name
 //					}
 //					fields = append(fields, fillField(field{
 //						name:      name,
@@ -170,11 +170,11 @@ type field struct {
 //	f.equalFold = foldFunc(f.nameBytes)
 //	return f
 //}
-//func parseStructField(StructField reflect.StructField) (stop bool) {
+//func parseStructField(structField reflect.structField) (stop bool) {
 //
-//	isUnexported := StructField.PkgPath != ""
-//	if StructField.Anonymous {
-//		t := StructField.Type
+//	isUnexported := structField.PkgPath != ""
+//	if structField.Anonymous {
+//		t := structField.Type
 //		if t.Kind() == reflect.Ptr {
 //			t = t.Elem()
 //		}
@@ -189,10 +189,10 @@ type field struct {
 //		return false
 //	}
 //	// Record found field and index sequence.
-//	if name != "" || !StructField.Anonymous || ft.Kind() != reflect.Struct {
+//	if name != "" || !structField.Anonymous || ft.Kind() != reflect.Struct {
 //		tagged := name != ""
 //		if name == "" {
-//			name = StructField.Name
+//			name = structField.Name
 //		}
 //		fields = append(fields, fillField(field{
 //			name:      name,
@@ -214,7 +214,7 @@ type field struct {
 //
 //}
 
-//func workFields(t reflect.Type, do func(StructField reflect.StructField) (stop bool)) {
+//func workFields(t reflect.Type, do func(structField reflect.structField) (stop bool)) {
 //	// Anonymous fields to explore at the current level and the next.
 //	current := []field{}
 //	next := []field{{typ: t}}
@@ -245,15 +245,15 @@ type field struct {
 //			}
 //			// Scan f.typ for fields to include.
 //			for i := 0; i < f.typ.NumField(); i++ {
-//				StructField := f.typ.Field(i)
-//				if do(StructField) {
+//				structField := f.typ.Field(i)
+//				if do(structField) {
 //					continue
 //				}
 //				index := make([]int, len(f.index)+1)
 //				copy(index, f.index)
 //				index[len(f.index)] = i
 //
-//				ft := StructField.Type
+//				ft := structField.Type
 //				if ft.Name() == "" && ft.Kind() == reflect.Ptr {
 //					// Follow pointer.
 //					ft = ft.Elem()
