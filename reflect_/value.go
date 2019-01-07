@@ -11,7 +11,6 @@ import (
 const PtrSize = 4 << (^uintptr(0) >> 63) // unsafe.Sizeof(uintptr(0)) but an ideal const, sizeof *void
 
 func IsEmptyValue(v reflect.Value) bool {
-	// return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
 	switch v.Kind() {
 	case reflect.Array, reflect.Map, reflect.Slice, reflect.String:
 		return v.Len() == 0
@@ -26,7 +25,7 @@ func IsEmptyValue(v reflect.Value) bool {
 	case reflect.Interface, reflect.Ptr:
 		return v.IsNil()
 	}
-	return false
+	return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
 }
 
 func IsZeroValue(v reflect.Value) bool {
