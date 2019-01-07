@@ -33,6 +33,10 @@ func (se *structConverter) convert(e *convertState, v reflect.Value, opts convOp
 			if !field.CanAddr() || !field.CanInterface() {
 				continue
 			}
+			// Ignore non-empty values
+			if !reflect_.IsEmptyValue(field) {
+				continue
+			}
 			if err := yaml.Unmarshal([]byte(se.fields[i].value), field.Addr().Interface()); err != nil {
 				e.error(&ConverterError{v.Type(), err})
 				return
