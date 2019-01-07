@@ -1,7 +1,6 @@
 package reflect_
 
 import (
-	"reflect"
 	"strings"
 	"unicode"
 )
@@ -58,29 +57,4 @@ func IsValidTagName(tagName string) bool {
 		}
 	}
 	return true
-}
-
-// v[i][j][...], v[i] is v's ith field, v[i][j] is v[i]'s jth field
-func FieldByStructIndex(v reflect.Value, index []int) reflect.Value {
-	for _, i := range index {
-		if v.Kind() == reflect.Ptr {
-			if v.IsNil() {
-				return reflect.Value{}
-			}
-			v = v.Elem()
-		}
-		v = v.Field(i)
-	}
-	return v
-}
-
-// t[i][j][...], t[i] is t's ith field, t[i][j] is t[i]'s jth field
-func TypeByStructFieldIndex(t reflect.Type, index []int) reflect.Type {
-	for _, i := range index {
-		if t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-		t = t.Field(i).Type
-	}
-	return t
 }
