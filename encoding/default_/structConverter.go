@@ -13,9 +13,8 @@ type field struct {
 
 	index []int
 
-	tag    bool
-	typ    reflect.Type
-	quoted bool
+	tag bool
+	typ reflect.Type
 }
 type structConverter struct {
 	fields     []field
