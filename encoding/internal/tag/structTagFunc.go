@@ -12,11 +12,16 @@ type structTagFunc struct {
 
 func (se *structTagFunc) handle(state *tagState, v reflect.Value, opts tagOpts) {
 	for i, f := range se.fields {
-		fv := reflect_.FieldByStructIndex(v, f.index)
+		fv := reflect_.ValueByStructFieldIndex(v, f.index)
 		if !fv.IsValid() && reflect_.IsEmptyValue(fv) {
 			continue
 		}
 		field := v.FieldByIndex(se.fields[i].index)
+		//if field.Type().Implements(taggerType) {
+		//	field.Interface().(Tagger).TagDefault()
+		//	continue
+		//}
+
 		//判断是否为可取指，可导出字段
 		if !field.CanAddr() || !field.CanInterface() {
 			continue

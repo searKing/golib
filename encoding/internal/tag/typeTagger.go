@@ -33,15 +33,15 @@ func typeConverter(t reflect.Type) tagFunc {
 	}
 
 	// Compute the real encoder and replace the indirect func with it.
-	f = newTypeConverter(t, true)
+	f = newTypeTagger(t, true)
 	wg.Done()
 	tagFuncs.Store(t, f)
 	return f
 }
 
-// newTypeEncoder constructs an convertorFunc for a type.
+// newTypeTagger constructs an tagFunc for a type.
 // The returned encoder only checks CanAddr when allowAddr is true.
-func newTypeConverter(t reflect.Type, allowAddr bool) tagFunc {
+func newTypeTagger(t reflect.Type, allowAddr bool) tagFunc {
 	// Handle UserDefined Case
 	// Convert v
 	if t.Implements(taggerType) {
@@ -52,7 +52,7 @@ func newTypeConverter(t reflect.Type, allowAddr bool) tagFunc {
 	// Convert &v, iterate only once
 	if t.Kind() != reflect.Ptr && allowAddr {
 		if reflect.PtrTo(t).Implements(taggerType) {
-			return newCondAddrTagFunc(addrUserDefinedTagFunc, newTypeConverter(t, false))
+			return newCondAddrTagFunc(addrUserDefinedTagFunc, newTypeTagger(t, false))
 		}
 	}
 

@@ -14,7 +14,7 @@ type inputType struct {
 }
 type Name string
 
-func (thiz *Name) ConvertDefault() error {
+func (thiz *Name) ConvertDefault(_ reflect.Value, _ reflect.StructTag) error {
 	if *thiz == "" {
 		*thiz = "Bob"
 	}
@@ -23,7 +23,7 @@ func (thiz *Name) ConvertDefault() error {
 func TestConvert(t *testing.T) {
 	i := &inputType{}
 	expect := &inputType{
-		Name:        "Alice",
+		Name:        "Bob",
 		Age:         10,
 		IntArray:    []int{1, 2, 3},
 		StringArray: []string{"stdout", "./logs"},
@@ -36,4 +36,5 @@ func TestConvert(t *testing.T) {
 	if !reflect.DeepEqual(i, expect) {
 		t.Errorf("expect\n[\n%v\n]\nactual[\n%v\n]", expect, i)
 	}
+
 }
