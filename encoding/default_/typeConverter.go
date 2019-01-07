@@ -5,6 +5,9 @@ import (
 	"sync"
 )
 
+var converterCache converterCacheMap // map[reflect.Type]convertFunc
+var converterType = reflect.TypeOf(new(Converter)).Elem()
+
 func typeConverter(t reflect.Type) convertFunc {
 	if fi, ok := converterCache.Load(t); ok {
 		return fi

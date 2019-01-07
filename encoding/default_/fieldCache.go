@@ -47,11 +47,13 @@ func cachedTypeFields(t reflect.Type) []field {
 	}
 	fields := []field{}
 	reflect_.WalkTypeDFS(t, func(info reflect_.FieldTypeInfo) (goon bool) {
-		sf := info.StructField
-		if reflect_.IsEmptyValue(reflect.ValueOf(sf)) {
+		// ignore struct's root
+		if info.Depth() == 0 {
 			return true
 		}
-		if info.Depth() == 0 {
+
+		sf := info.StructField
+		if reflect_.IsEmptyValue(reflect.ValueOf(sf)) {
 			return true
 		}
 		// Handle Tag
