@@ -15,8 +15,6 @@ func (_ *convertState) Reset() {
 
 var convertStatePool sync.Pool
 
-type convertFunc func(e *convertState, v reflect.Value, opts convOpts)
-
 func newConvertState() *convertState {
 	if v := convertStatePool.Get(); v != nil {
 		e := v.(*convertState)

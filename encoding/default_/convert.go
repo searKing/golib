@@ -1,11 +1,8 @@
 package default_
 
-import (
-	"reflect"
-)
-
 type convOpts struct{}
 
+// Convert wrapper of convertState
 func Convert(v interface{}) error {
 	e := newConvertState()
 	err := e.convert(v, convOpts{})
@@ -22,10 +19,4 @@ func Convert(v interface{}) error {
 // can marshal themselves into valid JSON.
 type Converter interface {
 	ConvertDefault() error
-}
-
-func invalidValueConverter(e *convertState, v reflect.Value, _ convOpts) {
-}
-func unsupportedTypeConverter(e *convertState, v reflect.Value, _ convOpts) {
-	e.error(&UnsupportedTypeError{v.Type()})
 }
