@@ -1,27 +1,26 @@
-package default_
+package tag
 
 import (
 	"reflect"
 	"sync"
 )
 
-// An encodeState encodes JSON into a bytes.Buffer.
-type convertState struct {
-}
+// An convertState encodes JSON into a bytes.Buffer.
+type tagState struct{}
 
-func (_ *convertState) Reset() {
+func (_ *tagState) Reset() {
 	return
 }
 
-var convertStatePool sync.Pool
+var tagStatePool sync.Pool
 
-func newConvertState() *convertState {
-	if v := convertStatePool.Get(); v != nil {
-		e := v.(*convertState)
+func newTagState() *tagState {
+	if v := tagStatePool.Get(); v != nil {
+		e := v.(*tagState)
 		e.Reset()
 		return e
 	}
-	return new(convertState)
+	return new(tagState)
 }
 
 // defaultError is an error wrapper type for internal use only.
@@ -29,7 +28,7 @@ func newConvertState() *convertState {
 // can distinguish intentional panics from this package.
 type defaultError struct{ error }
 
-func (e *convertState) convert(v interface{}, opts convOpts) (err error) {
+func (e *tagState) handle(v interface{}, opts tagOpts) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if je, ok := r.(defaultError); ok {
@@ -44,9 +43,9 @@ func (e *convertState) convert(v interface{}, opts convOpts) (err error) {
 }
 
 // error aborts the encoding by panicking with err wrapped in defaultError.
-func (e *convertState) error(err error) {
+func (e *tagState) error(err error) {
 	panic(defaultError{err})
 }
-func (e *convertState) reflectValue(v reflect.Value, opts convOpts) {
-	valueConverter(v)(e, v, opts)
+func (e *tagState) reflectValue(v reflect.Value, opts tagOpts) {
+	valueTaggeFunc(v)(e, v, opts)
 }

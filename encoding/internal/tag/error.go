@@ -1,18 +1,18 @@
-package default_
+package tag
 
 import "reflect"
 
-type ConverterError struct {
+type TaggerError struct {
 	Type reflect.Type
 	Err  error
 }
 
-func (e *ConverterError) Error() string {
-	return "default: error calling ConvertDefault for type " + e.Type.String() + ": " + e.Err.Error()
+func (e *TaggerError) Error() string {
+	return "default: error calling TagDefault for type " + e.Type.String() + ": " + e.Err.Error()
 }
 
 // An UnsupportedTypeError is returned by Marshal when attempting
-// to convert an unsupported value type.
+// to handle an unsupported structTag type.
 type UnsupportedTypeError struct {
 	Type reflect.Type
 }
@@ -27,5 +27,5 @@ type UnsupportedValueError struct {
 }
 
 func (e *UnsupportedValueError) Error() string {
-	return "default: unsupported value: " + e.Str
+	return "default: unsupported structTag: " + e.Str
 }

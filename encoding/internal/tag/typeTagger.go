@@ -1,15 +1,16 @@
-package default_
+package tag
 
 import (
 	"reflect"
 	"sync"
 )
 
-var converterCache converterCacheMap // map[reflect.Type]convertFunc
-var converterType = reflect.TypeOf(new(Converter)).Elem()
+var tagFuncs tagFuncMap // map[reflect.Type]convertFunc
 
-func typeConverter(t reflect.Type) convertFunc {
-	if fi, ok := converterCache.Load(t); ok {
+var taggerType = reflect.TypeOf(new(Tagger)).Elem()
+
+func typeConverter(t reflect.Type) tagFunc {
+	if fi, ok := tagFuncs.Load(t); ok {
 		return fi
 	}
 
@@ -19,10 +20,10 @@ func typeConverter(t reflect.Type) convertFunc {
 	// func is only used for recursive types.
 	var (
 		wg sync.WaitGroup
-		f  convertFunc
+		f  tagFunc
 	)
 	wg.Add(1)
-	fi, loaded := converterCache.LoadOrStore(t, convertFunc(func(e *convertState, v reflect.Value, opts convOpts) {
+	fi, loaded := tagFuncs.LoadOrStore(t, tagFunc(func(e *tagState, v reflect.Value, opts tagOpts) {
 		// wait until f is assigned elsewhere
 		wg.Wait()
 		f(e, v, opts)
@@ -34,33 +35,33 @@ func typeConverter(t reflect.Type) convertFunc {
 	// Compute the real encoder and replace the indirect func with it.
 	f = newTypeConverter(t, true)
 	wg.Done()
-	converterCache.Store(t, f)
+	tagFuncs.Store(t, f)
 	return f
 }
 
 // newTypeEncoder constructs an convertorFunc for a type.
 // The returned encoder only checks CanAddr when allowAddr is true.
-func newTypeConverter(t reflect.Type, allowAddr bool) convertFunc {
+func newTypeConverter(t reflect.Type, allowAddr bool) tagFunc {
 	// Handle UserDefined Case
 	// Convert v
-	if t.Implements(converterType) {
-		return userDefinedConverter
+	if t.Implements(taggerType) {
+		return userDefinedTagFunc
 	}
 
 	// Handle UserDefined Case
 	// Convert &v, iterate only once
 	if t.Kind() != reflect.Ptr && allowAddr {
-		if reflect.PtrTo(t).Implements(converterType) {
-			return newCondAddrConverter(addrUserDefinedConverter, newTypeConverter(t, false))
+		if reflect.PtrTo(t).Implements(taggerType) {
+			return newCondAddrTagFunc(addrUserDefinedTagFunc, newTypeConverter(t, false))
 		}
 	}
 
 	// Handle BuiltinDefault Case
 	switch t.Kind() {
 	case reflect.Struct:
-		return newStructConverter(t)
+		return newStructTagFunc(t)
 	case reflect.Ptr:
-		return newPtrConverter(t)
+		return newPtrTagFunc(t)
 	case reflect.Bool:
 		fallthrough
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
