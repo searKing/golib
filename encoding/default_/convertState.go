@@ -1,15 +1,16 @@
 package default_
 
 import (
-	"bytes"
 	"reflect"
 	"sync"
 )
 
 // An encodeState encodes JSON into a bytes.Buffer.
 type convertState struct {
-	bytes.Buffer // accumulated output
-	scratch      [64]byte
+}
+
+func (_ *convertState) Reset() {
+	return
 }
 
 var convertStatePool sync.Pool
