@@ -24,7 +24,7 @@ func (thiz *Name) TagDefault() error {
 func TestTag(t *testing.T) {
 	i := &inputType{}
 	expect := &inputType{
-		Name:        "Alice",
+		Name:        "Bob",
 		Age:         10,
 		IntArray:    []int{1, 2, 3},
 		StringArray: []string{"stdout", "./logs"},

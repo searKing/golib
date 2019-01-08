@@ -7,12 +7,11 @@ type condAddrTagFunc struct {
 	canAddrTagFunc, elseTagFunc tagFunc
 }
 
-func (ce *condAddrTagFunc) handle(e *tagState, v reflect.Value, opts tagOpts) {
+func (ce *condAddrTagFunc) handle(e *tagState, v reflect.Value, opts tagOpts) (isUserDefined bool) {
 	if v.CanAddr() {
-		ce.canAddrTagFunc(e, v, opts)
-	} else {
-		ce.elseTagFunc(e, v, opts)
+		return ce.canAddrTagFunc(e, v, opts)
 	}
+	return ce.elseTagFunc(e, v, opts)
 }
 
 // newCondAddrConverter returns an encoder that checks whether its structTag

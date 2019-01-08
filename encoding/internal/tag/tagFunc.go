@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type tagFunc func(e *tagState, v reflect.Value, opts tagOpts)
+type tagFunc func(e *tagState, v reflect.Value, opts tagOpts) (isUserDefined bool)
 
 // map[reflect.Type]tagFunc
 type tagFuncMap struct {

@@ -9,7 +9,7 @@ var tagFuncs tagFuncMap // map[reflect.Type]convertFunc
 
 var taggerType = reflect.TypeOf(new(Tagger)).Elem()
 
-func typeConverter(t reflect.Type) tagFunc {
+func typeTagFunc(t reflect.Type) tagFunc {
 	if fi, ok := tagFuncs.Load(t); ok {
 		return fi
 	}
@@ -23,10 +23,10 @@ func typeConverter(t reflect.Type) tagFunc {
 		f  tagFunc
 	)
 	wg.Add(1)
-	fi, loaded := tagFuncs.LoadOrStore(t, tagFunc(func(e *tagState, v reflect.Value, opts tagOpts) {
+	fi, loaded := tagFuncs.LoadOrStore(t, tagFunc(func(e *tagState, v reflect.Value, opts tagOpts) (isUserDefined bool) {
 		// wait until f is assigned elsewhere
 		wg.Wait()
-		f(e, v, opts)
+		return f(e, v, opts)
 	}))
 	if loaded {
 		return fi

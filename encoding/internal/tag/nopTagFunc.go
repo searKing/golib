@@ -5,9 +5,9 @@ import "reflect"
 type nopTagFunc struct {
 }
 
-func (_ *nopTagFunc) handle(e *tagState, v reflect.Value, opts tagOpts) {
+func (_ *nopTagFunc) handle(e *tagState, v reflect.Value, opts tagOpts) (isUserDefined bool) {
 	// nop
-	return
+	return false
 }
 
 func newNopConverter(t reflect.Type) tagFunc {

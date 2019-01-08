@@ -6,24 +6,27 @@ import (
 )
 
 type structTagFunc struct {
-	fields     []field
-	fieldConvs []tagFunc
+	fields       []field
+	fieldTagFunc []tagFunc
 }
 
-func (se *structTagFunc) handle(state *tagState, v reflect.Value, opts tagOpts) {
+func (se *structTagFunc) handle(state *tagState, v reflect.Value, opts tagOpts) (isUserDefined bool) {
+	isUserDefined = false
+
 	for i, f := range se.fields {
 		fv := reflect_.ValueByStructFieldIndex(v, f.index)
 		if !fv.IsValid() && reflect_.IsEmptyValue(fv) {
 			continue
 		}
 		field := v.FieldByIndex(se.fields[i].index)
-		//if field.Type().Implements(taggerType) {
-		//	field.Interface().(Tagger).TagDefault()
-		//	continue
-		//}
 
 		//判断是否为可取指，可导出字段
 		if !field.CanAddr() || !field.CanInterface() {
+			continue
+		}
+
+		// continue if a userDefined func has been called
+		if isFieldTagFuncUserDefined := se.fieldTagFunc[i](state, fv, opts); isFieldTagFuncUserDefined {
 			continue
 		}
 
@@ -34,18 +37,18 @@ func (se *structTagFunc) handle(state *tagState, v reflect.Value, opts tagOpts) 
 				return
 			}
 		}
-		se.fieldConvs[i](state, fv, opts)
 	}
+	return
 }
 
 func newStructTagFunc(t reflect.Type) tagFunc {
 	fields := cachedTypeFields(t)
 	se := &structTagFunc{
-		fields:     fields,
-		fieldConvs: make([]tagFunc, len(fields)),
+		fields:       fields,
+		fieldTagFunc: make([]tagFunc, len(fields)),
 	}
 	for i, f := range fields {
-		se.fieldConvs[i] = typeConverter(reflect_.TypeByStructFieldIndex(t, f.index))
+		se.fieldTagFunc[i] = typeTagFunc(reflect_.TypeByStructFieldIndex(t, f.index))
 	}
 	return se.handle
 }

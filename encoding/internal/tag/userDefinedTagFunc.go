@@ -3,7 +3,8 @@ package tag
 import "reflect"
 
 // Convert v
-func userDefinedTagFunc(e *tagState, v reflect.Value, _ tagOpts) {
+func userDefinedTagFunc(e *tagState, v reflect.Value, _ tagOpts) (isUserDefined bool) {
+	isUserDefined = true
 	if v.Kind() == reflect.Ptr && v.IsNil() {
 		return
 	}
@@ -15,10 +16,12 @@ func userDefinedTagFunc(e *tagState, v reflect.Value, _ tagOpts) {
 	if err != nil {
 		e.error(&TaggerError{v.Type(), err})
 	}
+	return
 }
 
 // Convert &v
-func addrUserDefinedTagFunc(e *tagState, v reflect.Value, _ tagOpts) {
+func addrUserDefinedTagFunc(e *tagState, v reflect.Value, _ tagOpts) (isUserDefined bool) {
+	isUserDefined = true
 	va := v.Addr()
 	if va.IsNil() {
 		return
@@ -29,4 +32,5 @@ func addrUserDefinedTagFunc(e *tagState, v reflect.Value, _ tagOpts) {
 	if err != nil {
 		e.error(&TaggerError{v.Type(), err})
 	}
+	return
 }
