@@ -12,18 +12,20 @@ const TagDefault = "default"
 // Convert wrapper of convertState
 func Convert(val interface{}) error {
 	return tag.Tag(val, func(val reflect.Value, tag reflect.StructTag) error {
-		fn := newTypeConverter(func(val reflect.Value, tag reflect.StructTag) error {
+		fn := newTypeConverter(func(val reflect.Value, tag reflect.StructTag) (isUserDefined bool, err error) {
+			isUserDefined = false
 			if !reflect_.IsEmptyValue(val) {
-				return nil
+				return
 			}
 			defaultTag, ok := tag.Lookup(TagDefault)
 			if !ok {
-				return nil
+				return
 			}
-			return yaml.Unmarshal([]byte(defaultTag), val.Addr().Interface())
+			return isUserDefined, yaml.Unmarshal([]byte(defaultTag), val.Addr().Interface())
 		}, val.Type(), true)
 
-		return fn(val, tag)
+		_, err := fn(val, tag)
+		return err
 	})
 }
 

@@ -3,31 +3,27 @@ package default_
 import "reflect"
 
 // Convert v
-func userDefinedConvertFunc( /*userDefinedInterfaceType reflect.Type,*/ v reflect.Value, tag reflect.StructTag) error {
+func userDefinedConvertFunc(v reflect.Value, tag reflect.StructTag) (isUserDefined bool, err error) {
+	isUserDefined = true
 	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return nil
+		return
 	}
-	//for idx := 0; idx < v.NumMethod(); idx++{
-	//	if v.Method(idx).Type().Implements(userDefinedInterfaceType) {
-	//
-	//	}
-	//}
-	//reflect.TypeOf(new(Converter)).Elem().Method(0).Func.Call([]reflect.Value{v, reflect.ValueOf(tag)})
 	m, ok := v.Interface().(Converter)
 	if !ok {
-		return nil
+		return
 	}
-	return m.ConvertDefault(v, tag)
+	return isUserDefined, m.ConvertDefault(v, tag)
 }
 
 // Convert &v
-func addrUserDefinedConvertFunc(v reflect.Value, tag reflect.StructTag) error {
+func addrUserDefinedConvertFunc(v reflect.Value, tag reflect.StructTag) (isUserDefined bool, err error) {
+	isUserDefined = true
 	va := v.Addr()
 	if va.IsNil() {
-		return nil
+		return
 	}
 	m := va.Interface().(Converter)
-	return m.ConvertDefault(v, tag)
+	return isUserDefined, m.ConvertDefault(v, tag)
 }
 
 // newTypeConverter constructs an convertorFunc for a type.
@@ -54,7 +50,7 @@ type condAddrConvertFunc struct {
 	canAddrConvert, elseConvert convertFunc
 }
 
-func (ce *condAddrConvertFunc) handle(v reflect.Value, tag reflect.StructTag) error {
+func (ce *condAddrConvertFunc) handle(v reflect.Value, tag reflect.StructTag) (isUserDefined bool, err error) {
 	if v.CanAddr() {
 		return ce.canAddrConvert(v, tag)
 	}
