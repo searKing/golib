@@ -12,6 +12,7 @@ const (
 	DefaultSizeClientKey     = 16
 	DefaultSizeClientSecret  = 32
 	DefaultSizeAuthorizeCode = 16
+	DefaultSizeUUID          = 64
 )
 
 // Here are some examples of client IDs from services that support OAuth 2.0:
@@ -53,4 +54,8 @@ func AuthorizeCode() string {
 }
 func AuthorizeCodeWithSize(len int) string {
 	return base64.RawURLEncoding.EncodeToString(rand_.Bytes(len))
+}
+
+func UUID() string {
+	return AuthorizeCode()
 }
