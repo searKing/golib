@@ -68,7 +68,7 @@ type JWTAuth struct {
 	// Callback function that should perform the authentication of the user based on userID and
 	// password. Must return true on success, false on failure. Required.
 	// Option return user id, if so, user id will be stored in Claim Array.
-	AuthenticatorFunc func(ctx context.Context, r *http.Request) (appId string, pass bool) `options:"optional"`
+	AuthenticatorFunc func(ctx context.Context, r *http.Request) (clientId string, pass bool) `options:"optional"`
 
 	// Callback function that should perform the authorization of the authenticated user. Called
 	// only after an authentication success. Must return true on success, false on failure.
@@ -81,7 +81,7 @@ type JWTAuth struct {
 	// Note that the payload is not encrypted.
 	// The attributes mentioned on jwt.io can't be used as keys for the map.
 	// Optional, by default no additional data will be set.
-	PayloadFunc func(ctx context.Context, appId string) map[string]interface{} `options:"optional"`
+	PayloadFunc func(ctx context.Context, clientId string) map[string]interface{} `options:"optional"`
 
 	// User can define own UnauthorizedFunc func.
 	UnauthorizedFunc func(ctx context.Context, w http.ResponseWriter, status int) `options:"optional"`
@@ -139,14 +139,14 @@ func (mw *JWTAuth) AuthenticateHandler(ctx context.Context) http.Handler {
 // Reply will be of the form {"access_token": "ACCESS_TOKEN", "refresh_token": "REFRESH_TOKEN", "expires_in": "EXPIRES_IN"}.
 func (mw *JWTAuth) LoginHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		appId, ok := mw.Authenticator(ctx, r)
+		clientId, ok := mw.Authenticator(ctx, r)
 		if !ok {
 			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
 		}
 		// Create the token
 		claims := jwt.MapClaims{}
-		for key, value := range mw.Payload(ctx, appId) {
+		for key, value := range mw.Payload(ctx, clientId) {
 			claims[key] = value
 		}
 		now := mw.TimeNow(ctx)
@@ -214,7 +214,7 @@ func (mw *JWTAuth) RefreshHandler(ctx context.Context) http.Handler {
 // Callback function that should perform the authentication of the user based on userID and
 // password. Must return true on success, false on failure. Required.
 // Option return user id, if so, user id will be stored in Claim Array.
-func (mw *JWTAuth) Authenticator(ctx context.Context, r *http.Request) (appId string, pass bool) {
+func (mw *JWTAuth) Authenticator(ctx context.Context, r *http.Request) (clientId string, pass bool) {
 	if mw.AuthenticatorFunc != nil {
 		return mw.AuthenticatorFunc(ctx, r)
 	}
@@ -237,9 +237,9 @@ func (mw *JWTAuth) Authorizator(ctx context.Context, claims jwt.MapClaims, w htt
 // Note that the payload is not encrypted.
 // The attributes mentioned on jwt.io can't be used as keys for the map.
 // Optional, by default no additional data will be set.
-func (mw *JWTAuth) Payload(ctx context.Context, appId string) map[string]interface{} {
+func (mw *JWTAuth) Payload(ctx context.Context, clientId string) map[string]interface{} {
 	if mw.PayloadFunc != nil {
-		return mw.PayloadFunc(ctx, appId)
+		return mw.PayloadFunc(ctx, clientId)
 	}
 	return nil
 }
