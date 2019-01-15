@@ -73,7 +73,7 @@ type JWTAuth struct {
 	// Callback function that should perform the authorization of the authenticated user. Called
 	// only after an authentication success. Must return true on success, false on failure.
 	// Optional, default to success.
-	AuthorizatorFunc func(ctx context.Context, appId string, w http.ResponseWriter) (pass bool) `options:"optional"`
+	AuthorizatorFunc func(ctx context.Context, claims jwt.MapClaims, w http.ResponseWriter) (pass bool) `options:"optional"`
 
 	// Callback function that will be called during login.
 	// Using this function it is possible to add additional payload data to the webtoken.
@@ -85,9 +85,6 @@ type JWTAuth struct {
 
 	// User can define own UnauthorizedFunc func.
 	UnauthorizedFunc func(ctx context.Context, w http.ResponseWriter, status int) `options:"optional"`
-
-	// Set the identity handler function
-	IdentityFunc func(ctx context.Context, claims jwt.Claims) (appId string) `options:"optional"`
 
 	// TimeNowFunc provides the current time. You can override it to use another time value.
 	// This is useful for testing or if your server uses a different time zone than your tokens.
@@ -109,19 +106,28 @@ func NewJWTAuthFromFile(alg string, keyFiles ...string) *JWTAuth {
 	}
 }
 
-// AuthenticateHandler makes JWTAuth implement the Middleware interface.
+// AuthorizateHandler makes JWTAuth implement the Middleware interface.
+// 认证
 func (mw *JWTAuth) AuthenticateHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if mw.Scheme == nil {
 			mw.Unauthorized(ctx, w, http.StatusInternalServerError)
 			return
 		}
-		mw.Scheme.ReadHTTP(r)
+		if err := mw.Scheme.ReadHTTP(r); err != nil {
+			mw.Unauthorized(ctx, w, http.StatusForbidden)
+			return
+		}
 		claims := mw.Scheme.Claims
+		var mapClams jwt.MapClaims
+		if claims != nil {
+			mc, ok := claims.(jwt.MapClaims)
+			if ok {
+				mapClams = mc
+			}
+		}
 
-		appId := mw.Identity(ctx, claims)
-
-		if !mw.Authorizator(ctx, appId, w) {
+		if !mw.Authorizator(ctx, mapClams, w) {
 			mw.Unauthorized(ctx, w, http.StatusForbidden)
 			return
 		}
@@ -171,7 +177,7 @@ func (mw *JWTAuth) LoginHandler(ctx context.Context) http.Handler {
 func (mw *JWTAuth) RefreshHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := mw.Scheme.ReadHTTP(r); err != nil {
-			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
+			mw.Unauthorized(ctx, w, http.StatusForbidden)
 			return
 		}
 
@@ -179,7 +185,7 @@ func (mw *JWTAuth) RefreshHandler(ctx context.Context) http.Handler {
 		var claims jwt.MapClaims
 		claims, ok := mw.Scheme.Claims.(jwt.MapClaims)
 		if !ok {
-			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
+			mw.Unauthorized(ctx, w, http.StatusForbidden)
 			return
 		}
 
@@ -218,9 +224,9 @@ func (mw *JWTAuth) Authenticator(ctx context.Context, r *http.Request) (appId st
 // Callback function that should perform the authorization of the authenticated user. Called
 // only after an authentication success. Must return true on success, false on failure.
 // Optional, default to success.
-func (mw *JWTAuth) Authorizator(ctx context.Context, appId string, w http.ResponseWriter) (pass bool) {
+func (mw *JWTAuth) Authorizator(ctx context.Context, claims jwt.MapClaims, w http.ResponseWriter) (pass bool) {
 	if mw.AuthorizatorFunc != nil {
-		return mw.AuthorizatorFunc(ctx, appId, w)
+		return mw.AuthorizatorFunc(ctx, claims, w)
 	}
 	return true
 }
@@ -249,14 +255,6 @@ func (mw *JWTAuth) Unauthorized(ctx context.Context, w http.ResponseWriter, stat
 	}
 
 	return
-}
-
-// Set the identity handler function
-func (mw *JWTAuth) Identity(ctx context.Context, claims jwt.Claims) (appId string) {
-	if mw.IdentityFunc != nil {
-		return mw.IdentityFunc(ctx, claims)
-	}
-	return ""
 }
 
 // TimeNowFunc provides the current time. You can override it to use another time value.
