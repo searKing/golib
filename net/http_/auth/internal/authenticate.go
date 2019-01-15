@@ -1,9 +1,10 @@
-package auth
+package internal
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/searKing/golib/net/http_"
 	"io"
 	"net/http"
 )
@@ -17,7 +18,10 @@ type Authenticate struct {
 
 // Newauth realm="apps", type=1, title="Login to \"apps\"", Basic realm="simple"
 func (a *Authenticate) Write(w io.Writer) error {
-	fmt.Fprintf(w, `%s`, a.Newauth)
+	_, err := fmt.Fprintf(w, `%s`, a.Newauth)
+	if err != nil {
+		return err
+	}
 	if len(a.Params) > 0 {
 		fmt.Fprintf(w, ` `)
 		return a.Params.Write(w)
@@ -26,12 +30,13 @@ func (a *Authenticate) Write(w io.Writer) error {
 }
 
 func (a *Authenticate) String() string {
-	b := bytes.NewBuffer([]byte{})
-	bw := bufio.NewWriter(b)
+	var buf bytes.Buffer
+	bw := bufio.NewWriter(&buf)
 	if err := a.Write(bw); err != nil {
 		return ""
 	}
-	return b.String()
+	bw.Flush()
+	return buf.String()
 }
 
 // WWW-Authenticate: Newauth realm="apps", type=1, title="Login to \"apps\"", Basic realm="simple"
@@ -40,7 +45,6 @@ func (a *Authenticate) WriteHTTP(w http.ResponseWriter) {
 }
 
 func (a *Authenticate) WriteHTTPWithStatusCode(w http.ResponseWriter, statusCode int) {
-	w.Header().Set(HeaderFieldAuthenticate, a.String())
 	w.WriteHeader(statusCode)
-	w.Write([]byte(http.StatusText(statusCode)))
+	w.Header().Set(http_.HeaderFieldAuthenticate, a.String())
 }

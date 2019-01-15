@@ -1,4 +1,4 @@
-package jwt
+package jwt_
 
 // See: https://tools.ietf.org/html/rfc7519
 const (

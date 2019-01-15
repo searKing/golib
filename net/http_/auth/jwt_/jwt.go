@@ -1,6 +1,7 @@
-package jwt
+package jwt_
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/searKing/golib/crypto/auth"
@@ -53,10 +54,10 @@ type JWTAuth struct {
 	// https://jwt.io/introduction/
 	Schema string `options:"optional" default:"Bearer"`
 
-	Scheme AuthenticationScheme `options:"required"`
+	Scheme *AuthenticationScheme `options:"optional"`
 
 	// Duration that a jwt access-token is valid. Optional, defaults to one hour.
-	AccessExpireIn time.Duration `options:"optional"`
+	AccessExpireIn time.Duration `options:"optional" deault:""`
 	// Duration that a jwt refresh-token is valid. Optional, defaults to seven days.
 	// This field allows clients to refresh their token until MaxRefresh has passed.
 	// Note that clients can refresh their token in the last moment of MaxRefresh.
@@ -67,12 +68,12 @@ type JWTAuth struct {
 	// Callback function that should perform the authentication of the user based on userID and
 	// password. Must return true on success, false on failure. Required.
 	// Option return user id, if so, user id will be stored in Claim Array.
-	Authenticator func(r *http.Request) (appId string, pass bool) `options:"optional"`
+	AuthenticatorFunc func(ctx context.Context, r *http.Request) (appId string, pass bool) `options:"optional"`
 
 	// Callback function that should perform the authorization of the authenticated user. Called
 	// only after an authentication success. Must return true on success, false on failure.
 	// Optional, default to success.
-	Authorizator func(userID string, w http.ResponseWriter) bool `options:"optional"`
+	AuthorizatorFunc func(ctx context.Context, appId string, w http.ResponseWriter) (pass bool) `options:"optional"`
 
 	// Callback function that will be called during login.
 	// Using this function it is possible to add additional payload data to the webtoken.
@@ -80,71 +81,48 @@ type JWTAuth struct {
 	// Note that the payload is not encrypted.
 	// The attributes mentioned on jwt.io can't be used as keys for the map.
 	// Optional, by default no additional data will be set.
-	PayloadFunc func(appId string) map[string]interface{} `options:"optional"`
+	PayloadFunc func(ctx context.Context, appId string) map[string]interface{} `options:"optional"`
 
-	// User can define own Unauthorized func.
-	Unauthorized func(w http.ResponseWriter, status int) `options:"optional"`
+	// User can define own UnauthorizedFunc func.
+	UnauthorizedFunc func(ctx context.Context, w http.ResponseWriter, status int) `options:"optional"`
 
 	// Set the identity handler function
-	IdentityHandler func(claims jwt.Claims) string `options:"optional"`
+	IdentityFunc func(ctx context.Context, claims jwt.Claims) (appId string) `options:"optional"`
 
 	// TimeNowFunc provides the current time. You can override it to use another time value.
 	// This is useful for testing or if your server uses a different time zone than your tokens.
-	TimeNowFunc func() time.Time `options:"optional"`
+	TimeNowFunc func(ctx context.Context) time.Time `options:"optional"`
 }
 
-func (mw *JWTAuth) usingPublicKeyAlgo() bool {
-	return !mw.Scheme.Key.IsSymmetricKey()
+func NewJWTAuth(alg string, keys ...[]byte) *JWTAuth {
+	return &JWTAuth{
+		Scheme:          NewAuthenticationScheme(alg, keys...),
+		AccessExpireIn:  defaultAccessTokenExpireIn,
+		RefreshExpireIn: defaultRefreshTokenExpireIn,
+	}
 }
-
-// LoadDefault initialize jwt configs.
-func (mw *JWTAuth) LoadDefault() error {
-
-	if mw.AccessExpireIn == 0 {
-		mw.AccessExpireIn = defaultAccessTokenExpireIn
+func NewJWTAuthFromFile(alg string, keyFiles ...string) *JWTAuth {
+	return &JWTAuth{
+		Scheme:          NewAuthenticationSchemeFromFile(alg, keyFiles...),
+		AccessExpireIn:  defaultAccessTokenExpireIn,
+		RefreshExpireIn: defaultRefreshTokenExpireIn,
 	}
-
-	if mw.RefreshExpireIn == 0 {
-		mw.RefreshExpireIn = defaultRefreshTokenExpireIn
-	}
-
-	if mw.TimeNowFunc == nil {
-		mw.TimeNowFunc = time.Now
-	}
-
-	if mw.Authorizator == nil {
-		mw.Authorizator = func(userID string, w http.ResponseWriter) bool {
-			return true
-		}
-	}
-
-	if mw.Unauthorized == nil {
-		mw.Unauthorized = func(w http.ResponseWriter, statusCode int) {
-		}
-	}
-
-	if mw.IdentityHandler == nil {
-		mw.IdentityHandler = func(claims jwt.Claims) string {
-			return ""
-		}
-	}
-	return nil
 }
 
 // AuthenticateHandler makes JWTAuth implement the Middleware interface.
-func (mw *JWTAuth) AuthenticateHandler() http.Handler {
+func (mw *JWTAuth) AuthenticateHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := mw.LoadDefault(); err != nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
+		if mw.Scheme == nil {
+			mw.Unauthorized(ctx, w, http.StatusInternalServerError)
 			return
 		}
 		mw.Scheme.ReadHTTP(r)
 		claims := mw.Scheme.Claims
 
-		id := mw.IdentityHandler(claims)
+		appId := mw.Identity(ctx, claims)
 
-		if !mw.Authorizator(id, w) {
-			mw.unauthorized(w, http.StatusForbidden)
+		if !mw.Authorizator(ctx, appId, w) {
+			mw.Unauthorized(ctx, w, http.StatusForbidden)
 			return
 		}
 	})
@@ -153,34 +131,23 @@ func (mw *JWTAuth) AuthenticateHandler() http.Handler {
 // LoginHandler can be used by clients to get a jwt token.
 // Payload needs to be json in the form of {"username": "USERNAME", "password": "PASSWORD"}.
 // Reply will be of the form {"access_token": "ACCESS_TOKEN", "refresh_token": "REFRESH_TOKEN", "expires_in": "EXPIRES_IN"}.
-func (mw *JWTAuth) LoginHandler() http.Handler {
+func (mw *JWTAuth) LoginHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Initial middleware default setting.
-		if err := mw.LoadDefault(); err != nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
-			return
-		}
-
-		if mw.Authenticator == nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
-			return
-		}
-		appId, ok := mw.Authenticator(r)
+		appId, ok := mw.Authenticator(ctx, r)
 		if !ok {
-			mw.unauthorized(w, http.StatusUnauthorized)
+			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
 		}
 		// Create the token
 		claims := jwt.MapClaims{}
-		if mw.PayloadFunc != nil {
-			for key, value := range mw.PayloadFunc(appId) {
-				claims[key] = value
-			}
+		for key, value := range mw.Payload(ctx, appId) {
+			claims[key] = value
 		}
+		now := mw.TimeNow(ctx)
 
-		accessToken, refreshToken, accessTokenExpireIn, err := mw.GenerateTokens(claims, true)
+		accessToken, refreshToken, accessTokenExpireIn, err := mw.generateTokens(now, claims, true)
 		if err != nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
+			mw.Unauthorized(ctx, w, http.StatusInternalServerError)
 			return
 		}
 		mw.Scheme.WriteHTTP(w)
@@ -189,9 +156,9 @@ func (mw *JWTAuth) LoginHandler() http.Handler {
 			RefreshToken: refreshToken,
 			ExpiresIn:    accessTokenExpireIn.Format(defaultTimeFormat),
 		}
-		respBytes, err := json.Marshal(&resp)
-		if err == nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
+		respBytes, err := json.MarshalIndent(&resp, "", "\t")
+		if err != nil {
+			mw.Unauthorized(ctx, w, http.StatusInternalServerError)
 			return
 		}
 		w.Write(respBytes)
@@ -201,15 +168,10 @@ func (mw *JWTAuth) LoginHandler() http.Handler {
 // RefreshHandler can be used to refresh a token. The token still needs to be valid on refresh.
 // Shall be put under an endpoint that is using the JWTAuth.
 // Reply will be of the form {"access_token": "ACCESS_TOKEN", "expires_in": "EXPIRES_IN"}.
-func (mw *JWTAuth) RefreshHandler() http.Handler {
+func (mw *JWTAuth) RefreshHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Initial middleware default setting.
-		if err := mw.LoadDefault(); err != nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
-			return
-		}
 		if err := mw.Scheme.ReadHTTP(r); err != nil {
-			mw.unauthorized(w, http.StatusUnauthorized)
+			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
 		}
 
@@ -217,13 +179,15 @@ func (mw *JWTAuth) RefreshHandler() http.Handler {
 		var claims jwt.MapClaims
 		claims, ok := mw.Scheme.Claims.(jwt.MapClaims)
 		if !ok {
-			mw.unauthorized(w, http.StatusUnauthorized)
+			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
 		}
 
-		accessToken, _, accessTokenExpireIn, err := mw.GenerateTokens(claims, false)
+		now := mw.TimeNowFunc(ctx)
+
+		accessToken, _, accessTokenExpireIn, err := mw.generateTokens(now, claims, false)
 		if err != nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
+			mw.Unauthorized(ctx, w, http.StatusInternalServerError)
 			return
 		}
 		mw.Scheme.WriteHTTP(w)
@@ -231,9 +195,9 @@ func (mw *JWTAuth) RefreshHandler() http.Handler {
 			AccessToken: accessToken,
 			ExpiresIn:   accessTokenExpireIn.Format(defaultTimeFormat),
 		}
-		respBytes, err := json.Marshal(&resp)
-		if err == nil {
-			mw.unauthorized(w, http.StatusInternalServerError)
+		respBytes, err := json.MarshalIndent(&resp, "", "\t")
+		if err != nil {
+			mw.Unauthorized(ctx, w, http.StatusInternalServerError)
 			return
 		}
 		w.Write(respBytes)
@@ -241,9 +205,71 @@ func (mw *JWTAuth) RefreshHandler() http.Handler {
 	})
 }
 
-// GenerateTokens method that clients can use to get a jwt token pair.
-func (mw *JWTAuth) GenerateTokens(claims jwt.MapClaims, genRefreshToken bool) (accessToken, refreshToken string, accessTokenExpireIn time.Time, err error) {
-	now := mw.TimeNowFunc()
+// Callback function that should perform the authentication of the user based on userID and
+// password. Must return true on success, false on failure. Required.
+// Option return user id, if so, user id will be stored in Claim Array.
+func (mw *JWTAuth) Authenticator(ctx context.Context, r *http.Request) (appId string, pass bool) {
+	if mw.AuthenticatorFunc != nil {
+		return mw.AuthenticatorFunc(ctx, r)
+	}
+	return "", true
+}
+
+// Callback function that should perform the authorization of the authenticated user. Called
+// only after an authentication success. Must return true on success, false on failure.
+// Optional, default to success.
+func (mw *JWTAuth) Authorizator(ctx context.Context, appId string, w http.ResponseWriter) (pass bool) {
+	if mw.AuthorizatorFunc != nil {
+		return mw.AuthorizatorFunc(ctx, appId, w)
+	}
+	return true
+}
+
+// Callback function that will be called during login.
+// Using this function it is possible to add additional payload data to the webtoken.
+// The data is then made available during requests via c.Get("JWT_PAYLOAD").
+// Note that the payload is not encrypted.
+// The attributes mentioned on jwt.io can't be used as keys for the map.
+// Optional, by default no additional data will be set.
+func (mw *JWTAuth) Payload(ctx context.Context, appId string) map[string]interface{} {
+	if mw.PayloadFunc != nil {
+		return mw.PayloadFunc(ctx, appId)
+	}
+	return nil
+}
+
+// show 401 UnauthorizedFunc error.
+func (mw *JWTAuth) Unauthorized(ctx context.Context, w http.ResponseWriter, statusCode int) {
+	jwtAuth := NewJWTAuthenticate(mw.Realm, mw.Schema)
+	jwtAuth.WriteHTTPWithStatusCode(w, statusCode)
+
+	if mw.UnauthorizedFunc != nil {
+		mw.UnauthorizedFunc(ctx, w, statusCode)
+		return
+	}
+
+	return
+}
+
+// Set the identity handler function
+func (mw *JWTAuth) Identity(ctx context.Context, claims jwt.Claims) (appId string) {
+	if mw.IdentityFunc != nil {
+		return mw.IdentityFunc(ctx, claims)
+	}
+	return ""
+}
+
+// TimeNowFunc provides the current time. You can override it to use another time value.
+// This is useful for testing or if your server uses a different time zone than your tokens.
+func (mw *JWTAuth) TimeNow(ctx context.Context) time.Time {
+	if mw.TimeNowFunc != nil {
+		return mw.TimeNowFunc(ctx)
+	}
+	return time.Now()
+}
+
+// generateTokens method that clients can use to get a jwt token pair.
+func (mw *JWTAuth) generateTokens(now time.Time, claims jwt.MapClaims, genRefreshToken bool) (accessToken, refreshToken string, accessTokenExpireIn time.Time, err error) {
 	accessExpireIn := now.Add(mw.AccessExpireIn)
 	refreshExpireIn := now.Add(mw.RefreshExpireIn)
 	mw.Scheme.Claims = claims
@@ -260,7 +286,7 @@ func (mw *JWTAuth) GenerateTokens(claims jwt.MapClaims, genRefreshToken bool) (a
 	claims[ClaimsNotBefore] = now.Add(-1 * time.Second).Unix()
 	claims[ClaimsIssuedAt] = now.Unix()
 
-	if genRefreshToken && refreshExpireIn == (time.Time{}) {
+	if genRefreshToken && refreshExpireIn != (time.Time{}) {
 		claims[ClaimsExpirationTime] = refreshExpireIn.Unix()
 		claims[ClaimsJWTID] = auth.UUID()
 		// Refresh Token
@@ -278,12 +304,4 @@ func (mw *JWTAuth) GenerateTokens(claims jwt.MapClaims, genRefreshToken bool) (a
 		return "", "", time.Now(), err
 	}
 	return accessToken, refreshToken, accessExpireIn, nil
-}
-
-// show 401 unauthorized error.
-func (mw *JWTAuth) unauthorized(w http.ResponseWriter, statusCode int) {
-	auth := NewJWTAuthenticate(mw.Realm, mw.Schema)
-	auth.WriteHTTPWithStatusCode(w, statusCode)
-	mw.Unauthorized(w, statusCode)
-	return
 }

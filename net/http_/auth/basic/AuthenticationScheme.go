@@ -5,7 +5,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/searKing/golib/net/http_/auth"
+	"github.com/searKing/golib/net/http_"
+	"github.com/searKing/golib/net/http_/auth/internal"
 	"io"
 	"net/http"
 	"strings"
@@ -54,7 +55,7 @@ func (a *AuthenticationScheme) ReadString(basicCredentials string) {
 // Reference : https://tools.ietf.org/html/rfc1945#section-11 11.1
 func (a *AuthenticationScheme) ReadHTTP(r *http.Request) {
 	// Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
-	a.ReadString(auth.ParseAuthenticationCredentials(r))
+	a.ReadString(internal.ParseAuthenticationCredentials(r))
 }
 
 func (a *AuthenticationScheme) Write(w io.Writer) error {
@@ -66,15 +67,16 @@ func (a *AuthenticationScheme) Write(w io.Writer) error {
 }
 
 func (a *AuthenticationScheme) String() string {
-	b := bytes.NewBuffer([]byte{})
-	bw := bufio.NewWriter(b)
+	var buf bytes.Buffer
+	bw := bufio.NewWriter(&buf)
 	if err := a.Write(bw); err != nil {
 		return ""
 	}
-	return b.String()
+	bw.Flush()
+	return buf.String()
 }
 
 // Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
 func (a *AuthenticationScheme) WriteHTTP(w http.ResponseWriter) {
-	w.Header().Set(auth.HeaderFieldAuthorization, a.String())
+	w.Header().Set(http_.HeaderFieldAuthorization, a.String())
 }

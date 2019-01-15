@@ -1,4 +1,4 @@
-package jwt
+package jwt_
 
 // https://jwt.io/
 const (

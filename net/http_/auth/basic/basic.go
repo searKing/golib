@@ -6,7 +6,7 @@ import (
 
 // Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
 
-// HTTP/1.0  401 Unauthorized
+// HTTP/1.0  401 UnauthorizedFunc
 // Content-type: text/html
 // WWW-Authenticate: Basic realm="apps", type=1, title="Login to \"apps\"", Basic realm="simple"
 const (

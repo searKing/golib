@@ -1,4 +1,4 @@
-package jwt
+package jwt_
 
 import (
 	"bufio"
@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/searKing/golib/net/http_/auth"
+	"github.com/searKing/golib/net/http_"
+	"github.com/searKing/golib/net/http_/auth/internal"
 	"io"
 	"net/http"
 	"strings"
@@ -26,6 +27,7 @@ func NewAuthenticationScheme(alg string, keys ...[]byte) *AuthenticationScheme {
 		Key: NewAuthKey(alg, keys...),
 	}
 }
+
 func NewAuthenticationSchemeFromFile(alg string, keyFiles ...string) *AuthenticationScheme {
 	return &AuthenticationScheme{
 		Key: NewAuthKeyFromFile(alg, keyFiles...),
@@ -61,7 +63,7 @@ func (a *AuthenticationScheme) ReadString(basicCredentials string) error {
 // Reference : https://tools.ietf.org/html/rfc1945#section-11 11.1
 func (a *AuthenticationScheme) ReadHTTP(r *http.Request) error {
 	// Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
-	return a.ReadString(auth.ParseAuthenticationCredentials(r))
+	return a.ReadString(internal.ParseAuthenticationCredentials(r))
 }
 
 // if token is empty, generate; else reuse it
@@ -73,13 +75,13 @@ func (a *AuthenticationScheme) Write(w io.Writer) error {
 		}
 	}
 
-	fmt.Fprintf(w, `%s %s`, AuthSchemaJWT, a.bufferedToken)
-	return nil
+	_, err := fmt.Fprintf(w, `%s %s`, AuthSchemaJWT, a.bufferedToken)
+	return err
 }
 
 func (a *AuthenticationScheme) RefreshToken() (token string, err error) {
 	jwtToken, err := a.signedString(a.Claims)
-	if err == nil {
+	if err != nil {
 		return "", err
 	}
 	a.bufferedToken = jwtToken
@@ -87,17 +89,18 @@ func (a *AuthenticationScheme) RefreshToken() (token string, err error) {
 }
 
 func (a *AuthenticationScheme) String() string {
-	b := bytes.NewBuffer([]byte{})
-	bw := bufio.NewWriter(b)
+	var buf bytes.Buffer
+	bw := bufio.NewWriter(&buf)
 	if err := a.Write(bw); err != nil {
 		return ""
 	}
-	return b.String()
+	bw.Flush()
+	return buf.String()
 }
 
 // Authorization: Basic jwth.jwtb.jwts
 func (a *AuthenticationScheme) WriteHTTP(w http.ResponseWriter) {
-	w.Header().Set(auth.HeaderFieldAuthorization, a.String())
+	w.Header().Set(http_.HeaderFieldAuthorization, a.String())
 }
 
 func (a *AuthenticationScheme) signedString(claims jwt.Claims) (string, error) {

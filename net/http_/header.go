@@ -1,4 +1,4 @@
-package auth
+package http_
 
 const (
 	// https://tools.ietf.org/html/rfc1945#section-10.2

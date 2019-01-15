@@ -1,27 +1,31 @@
-package jwt
+package jwt_
 
 import (
 	"crypto/rsa"
+	"errors"
 	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
 )
 
 type AuthKey struct {
-	alg string
+	alg string `options:"optional" default:"none"`
 
 	// Private key
-	privKey *rsa.PrivateKey
+	privKey *rsa.PrivateKey `options:"optional"`
 
 	// Public key
-	pubKey *rsa.PublicKey
+	pubKey *rsa.PublicKey `options:"optional"`
 
 	// Secret key used for signing. Required.
-	symmetricKey []byte
+	symmetricKey []byte `options:"optional"`
 }
 
 // SymmetricKey : key
 // else: privKey publicKey
 func NewAuthKey(alg string, keys ...[]byte) *AuthKey {
+	if alg == "" {
+		alg = SigningMethodNone
+	}
 	authKey := &AuthKey{
 		alg: alg,
 	}
@@ -92,16 +96,18 @@ func (a *AuthKey) setPublicKey(keyData []byte) error {
 
 func (a *AuthKey) GetSignedKey(token *jwt.Token) (interface{}, error) {
 	if token != nil && jwt.GetSigningMethod(a.alg) != token.Method {
-		return nil, ErrInvalidSigningAlgorithm
+		return nil, errors.New("invalid signing method")
 	}
 	if a.IsSymmetricKey() {
 		return a.symmetricKey, nil
 	}
 	return a.pubKey, nil
 }
+
 func (a *AuthKey) GetSignedMethod() jwt.SigningMethod {
 	return jwt.GetSigningMethod(a.alg)
 }
+
 func (a *AuthKey) IsSymmetricKey() bool {
 	switch a.alg {
 	case SigningMethodRS256, SigningMethodRS384, SigningMethodRS512:
