@@ -52,7 +52,6 @@ func (a *AuthenticationScheme) ReadString(basicCredentials string) error {
 	}
 	if !token.Valid {
 		return errors.New("token is invalid")
-
 	}
 	a.Claims = token.Claims
 
