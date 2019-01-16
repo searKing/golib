@@ -91,19 +91,40 @@ type JWTAuth struct {
 	TimeNowFunc func(ctx context.Context) time.Time `options:"optional"`
 }
 
-func NewJWTAuth(alg string, keys ...[]byte) *JWTAuth {
+func NewJWTAuthFromRandom(alg string) (*JWTAuth, error) {
+	scheme, err := NewAuthenticationSchemeFromRandom(alg)
+	if err != nil {
+		return nil, err
+	}
 	return &JWTAuth{
-		Scheme:          NewAuthenticationScheme(alg, keys...),
+		Scheme:          scheme,
 		AccessExpireIn:  defaultAccessTokenExpireIn,
 		RefreshExpireIn: defaultRefreshTokenExpireIn,
-	}
+	}, err
 }
-func NewJWTAuthFromFile(alg string, keyFiles ...string) *JWTAuth {
+
+func NewJWTAuth(alg string, privateKey []byte, publicKey []byte, password ...string) (*JWTAuth, error) {
+	scheme, err := NewAuthenticationScheme(alg, privateKey, publicKey, password...)
+	if err != nil {
+		return nil, err
+	}
 	return &JWTAuth{
-		Scheme:          NewAuthenticationSchemeFromFile(alg, keyFiles...),
+		Scheme:          scheme,
 		AccessExpireIn:  defaultAccessTokenExpireIn,
 		RefreshExpireIn: defaultRefreshTokenExpireIn,
+	}, err
+}
+
+func NewJWTAuthFromFile(alg string, privateKeyFile string, publicKeyFile string, password ...string) (*JWTAuth, error) {
+	scheme, err := NewAuthenticationSchemeFromFile(alg, privateKeyFile, publicKeyFile, password...)
+	if err != nil {
+		return nil, err
 	}
+	return &JWTAuth{
+		Scheme:          scheme,
+		AccessExpireIn:  defaultAccessTokenExpireIn,
+		RefreshExpireIn: defaultRefreshTokenExpireIn,
+	}, err
 }
 
 // AuthorizateHandler makes JWTAuth implement the Middleware interface.

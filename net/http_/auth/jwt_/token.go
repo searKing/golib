@@ -22,16 +22,34 @@ type AuthenticationScheme struct {
 	bufferedToken string
 }
 
-func NewAuthenticationScheme(alg string, keys ...[]byte) *AuthenticationScheme {
-	return &AuthenticationScheme{
-		Key: NewAuthKey(alg, keys...),
+func NewAuthenticationSchemeFromRandom(alg string) (*AuthenticationScheme, error) {
+	authKey, err := NewAuthKeyFromRandowm(alg)
+	if err != nil {
+		return nil, err
 	}
+	return &AuthenticationScheme{
+		Key: authKey,
+	}, err
 }
 
-func NewAuthenticationSchemeFromFile(alg string, keyFiles ...string) *AuthenticationScheme {
-	return &AuthenticationScheme{
-		Key: NewAuthKeyFromFile(alg, keyFiles...),
+func NewAuthenticationScheme(alg string, privateKey []byte, publicKey []byte, password ...string) (*AuthenticationScheme, error) {
+	authKey, err := NewAuthKey(alg, privateKey, publicKey, password...)
+	if err != nil {
+		return nil, err
 	}
+	return &AuthenticationScheme{
+		Key: authKey,
+	}, err
+}
+
+func NewAuthenticationSchemeFromFile(alg string, privateKeyFile string, publicKeyFile string, password ...string) (*AuthenticationScheme, error) {
+	authKey, err := NewAuthKeyFromFile(alg, privateKeyFile, publicKeyFile, password...)
+	if err != nil {
+		return nil, err
+	}
+	return &AuthenticationScheme{
+		Key: authKey,
+	}, err
 }
 
 // basic-credentials = "Basic" SP basic-cookie
@@ -45,7 +63,7 @@ func (a *AuthenticationScheme) ReadString(basicCredentials string) error {
 	}
 	jwtToken := s[1]
 	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-		return a.Key.GetSignedKey(token)
+		return a.Key.GetVerifiedKey(token)
 	})
 	if err != nil {
 		return err
