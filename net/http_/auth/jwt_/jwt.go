@@ -47,7 +47,7 @@ type RefreshResp struct {
 // JWTAuth provides a Json-Web-Token authentication implementation. On failure, a 401 HTTP response
 // is returned. On success, the wrapped middleware is called, and the userID is made available as
 // c.Get("userID").(string).
-// Users can get a token by posting a json request to LoginHandler. The token then needs to be passed in
+// Users can get a token by posting a json request to AuthorizationEndointHandler. The token then needs to be passed in
 // the Authentication header. Example: Authorization:Bearer XXX_TOKEN_XXX
 type JWTAuth struct {
 	// Realm name to display to the user. Required.
@@ -242,29 +242,44 @@ func RetrieveClientPassword(ctx context.Context, r *http.Request) (*ClientPasswo
 		}
 		return &cp, nil
 	default:
-		clientId, clientSecret, ok := r.BasicAuth()
-		if !ok {
-			return nil, errors.New("invalid basic auth ")
+		vars := r.URL.Query()
+		clientIds := vars["client_id"]
+		if len(clientIds) == 0 {
+			return nil, errors.New("missing client_id")
+		}
+		clientSecrets := vars["client_secret"]
+		if len(clientSecrets) == 0 {
+			return nil, errors.New("missing client_secret")
+
 		}
 		return &ClientPassword{
-			ClientId:     clientId,
-			ClientSecret: clientSecret,
+			ClientId:     clientIds[0],
+			ClientSecret: clientSecrets[0],
 		}, nil
 
 	}
 }
-
-// LoginHandler can be used by clients to get a jwt token.
-// Payload needs to be json in the form of {"username": "USERNAME", "password": "PASSWORD"}.
-// Reply will be of the form {"access_token": "ACCESS_TOKEN", "refresh_token": "REFRESH_TOKEN", "expires_in": "EXPIRES_IN"}.
-func (mw *JWTAuth) LoginHandler(ctx context.Context) http.Handler {
+func (mw *JWTAuth) AccessTokenHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+	})
+}
+
+// AuthorizationEndointHandler can be used by clients to interact with the resource
+// owner and obtain an authorization grant.
+// MUST support "GET" and MAY support "POST" method as well.
+func (mw *JWTAuth) AuthorizationEndointHandler(ctx context.Context) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost || r.Method == http.MethodGet {
+
+		}
 		clientPassword, err := RetrieveClientPassword(ctx, r)
 		if err != nil {
 			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
 		}
 
+		// The authorization server MUST first verify the identity of the resource owner.
 		if !mw.Authenticator(ctx, clientPassword) {
 			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
