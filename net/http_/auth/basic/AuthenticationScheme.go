@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// for Auth check
+// basic-credentials = "Basic" SP basic-cookie
 type AuthenticationScheme struct {
 	UserID   string
 	Password string
@@ -55,6 +55,8 @@ func (a *AuthenticationScheme) ReadString(basicCredentials string) {
 // Reference : https://tools.ietf.org/html/rfc1945#section-11 11.1
 func (a *AuthenticationScheme) ReadHTTP(r *http.Request) {
 	// Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
+	// Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
+	// QWxhZGRpbjpvcGVuIHNlc2FtZQ==
 	a.ReadString(internal.ParseAuthenticationCredentials(r))
 }
 

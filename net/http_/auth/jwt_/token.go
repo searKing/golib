@@ -120,6 +120,16 @@ func (a *AuthenticationScheme) WriteHTTP(w http.ResponseWriter) {
 	w.Header().Set(http_.HeaderFieldAuthorization, a.String())
 }
 
+// SetAuthHeader sets the Authorization header to r using the access
+// token in t.
+//
+// This method is unnecessary when using Transport or an HTTP Client
+// returned by this package.
+// Authorization: Basic jwth.jwtb.jwts
+func (a *AuthenticationScheme) SetAuthHeader(r *http.Request) {
+	r.Header.Set("Authorization", a.String())
+}
+
 func (a *AuthenticationScheme) signedString(claims jwt.Claims) (string, error) {
 	token := jwt.NewWithClaims(a.Key.GetSignedMethod(), claims)
 	key, err := a.Key.GetSignedKey(nil)

@@ -3,9 +3,17 @@ package jwt_
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/searKing/golib/crypto/auth"
+	"github.com/searKing/golib/encoding/json_"
+	"io"
+	"io/ioutil"
+	"mime"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -20,9 +28,6 @@ const (
 	AuthSchemaJWT               = "Bearer"
 	defaultAccessTokenExpireIn  = time.Hour
 	defaultRefreshTokenExpireIn = 7 * 24 * time.Hour
-	defaultIssuer               = "default-go-jwt"
-	defaultSubject              = "default-go-jwt-authorize-server"
-	defaultAudience             = "*"
 	defaultTimeFormat           = time.RFC3339
 )
 
@@ -49,10 +54,14 @@ type JWTAuth struct {
 	// https://tools.ietf.org/html/rfc7235#section-2.2
 	Realm string `options:"optional" default:""`
 
+	// https://jwt.io/introduction/
+	// https://auth0.com/learn/json-web-tokens/
 	// Whenever the user wants to access a protected route or resource,
 	// the user agent should send the JWT,
-	// https://jwt.io/introduction/
-	Schema string `options:"optional" default:"Bearer"`
+	// typically in the Authorization header using the Bearer schema.
+	// The content of the header should look like the following:
+	// 		Authorization: Bearer <token>
+	TokenSchema string `options:"optional" default:"Bearer"`
 
 	Scheme *AuthenticationScheme `options:"optional"`
 
@@ -68,7 +77,7 @@ type JWTAuth struct {
 	// Callback function that should perform the authentication of the user based on userID and
 	// password. Must return true on success, false on failure. Required.
 	// Option return user id, if so, user id will be stored in Claim Array.
-	AuthenticatorFunc func(ctx context.Context, r *http.Request) (clientId string, pass bool) `options:"optional"`
+	AuthenticatorFunc func(ctx context.Context, password *ClientPassword) (pass bool) `options:"optional"`
 
 	// Callback function that should perform the authorization of the authenticated user. Called
 	// only after an authentication success. Must return true on success, false on failure.
@@ -81,7 +90,7 @@ type JWTAuth struct {
 	// Note that the payload is not encrypted.
 	// The attributes mentioned on jwt.io can't be used as keys for the map.
 	// Optional, by default no additional data will be set.
-	PayloadFunc func(ctx context.Context, clientId string) map[string]interface{} `options:"optional"`
+	JWTExtraFunc func(ctx context.Context, clientId string) map[string]interface{} `options:"optional"`
 
 	// User can define own UnauthorizedFunc func.
 	UnauthorizedFunc func(ctx context.Context, w http.ResponseWriter, status int) `options:"optional"`
@@ -127,6 +136,30 @@ func NewJWTAuthFromFile(alg string, privateKeyFile string, publicKeyFile string,
 	}, err
 }
 
+// Type returns t.TokenType if non-empty, else "Bearer".
+// https://jwt.io/introduction/
+// https://auth0.com/learn/json-web-tokens/
+// Whenever the user wants to access a protected route or resource,
+// the user agent should send the JWT,
+// typically in the Authorization header using the Bearer schema.
+// The content of the header should look like the following:
+// 		Authorization: Bearer <token>
+func (mw *JWTAuth) Schema() string {
+	if strings.EqualFold(mw.TokenSchema, "bearer") {
+		return "Bearer"
+	}
+	if strings.EqualFold(mw.TokenSchema, "mac") {
+		return "MAC"
+	}
+	if strings.EqualFold(mw.TokenSchema, "basic") {
+		return "Basic"
+	}
+	if mw.TokenSchema != "" {
+		return mw.TokenSchema
+	}
+	return "Bearer"
+}
+
 // AuthorizateHandler makes JWTAuth implement the Middleware interface.
 // 认证
 func (mw *JWTAuth) AuthenticateHandler(ctx context.Context) http.Handler {
@@ -147,6 +180,10 @@ func (mw *JWTAuth) AuthenticateHandler(ctx context.Context) http.Handler {
 				mapClams = mc
 			}
 		}
+		if token_type, ok := mapClams["token_type"]; !ok || token_type != "access_token" {
+			mw.Unauthorized(ctx, w, http.StatusForbidden)
+			return
+		}
 
 		if !mw.Authorizator(ctx, mapClams, w) {
 			mw.Unauthorized(ctx, w, http.StatusForbidden)
@@ -155,19 +192,87 @@ func (mw *JWTAuth) AuthenticateHandler(ctx context.Context) http.Handler {
 	})
 }
 
+// rfc6749 2.3.1
+type ClientPassword struct {
+	// The client identifier issued to the client during
+	// the registration process
+	ClientId string `json:"client_id" options:"required"`
+	// The client secret.  The client MAY omit the
+	// parameter if the client secret is an empty string.
+	ClientSecret string `json:"client_secret,omitempty" options:"required"`
+}
+
+// rfc6749 2.3.1
+func RetrieveClientPassword(ctx context.Context, r *http.Request) (*ClientPassword, error) {
+	defer r.Body.Close()
+
+	// rfc6749 2.3.1
+	//  The authorization server MUST support the HTTP Basic
+	//   authentication scheme for authenticating clients that were issued a
+	//   client password.
+	if clientId, clientSecret, ok := r.BasicAuth(); ok {
+		return &ClientPassword{
+			ClientId:     clientId,
+			ClientSecret: clientSecret,
+		}, nil
+	}
+	//Alternatively, the authorization server MAY support including the
+	//client credentials in the request-body using the following
+	//parameters
+	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
+	}
+	content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	switch content {
+	case "application/x-www-form-urlencoded", "text/plain":
+		vals, err := url.ParseQuery(string(body))
+		if err != nil {
+			return nil, err
+		}
+		return &ClientPassword{
+			ClientId:     vals.Get("client_id"),
+			ClientSecret: vals.Get("client_secret"),
+		}, nil
+	case "application/json":
+		var cp ClientPassword
+		if err = json.Unmarshal(body, &cp); err != nil {
+
+			return nil, err
+		}
+		return &cp, nil
+	default:
+		clientId, clientSecret, ok := r.BasicAuth()
+		if !ok {
+			return nil, errors.New("invalid basic auth ")
+		}
+		return &ClientPassword{
+			ClientId:     clientId,
+			ClientSecret: clientSecret,
+		}, nil
+
+	}
+}
+
 // LoginHandler can be used by clients to get a jwt token.
 // Payload needs to be json in the form of {"username": "USERNAME", "password": "PASSWORD"}.
 // Reply will be of the form {"access_token": "ACCESS_TOKEN", "refresh_token": "REFRESH_TOKEN", "expires_in": "EXPIRES_IN"}.
 func (mw *JWTAuth) LoginHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		clientId, ok := mw.Authenticator(ctx, r)
-		if !ok {
+		clientPassword, err := RetrieveClientPassword(ctx, r)
+		if err != nil {
 			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
 			return
 		}
+
+		if !mw.Authenticator(ctx, clientPassword) {
+			mw.Unauthorized(ctx, w, http.StatusUnauthorized)
+			return
+		}
+
 		// Create the token
 		claims := jwt.MapClaims{}
-		for key, value := range mw.Payload(ctx, clientId) {
+		for key, value := range mw.JWTExtra(ctx, clientPassword.ClientId) {
 			claims[key] = value
 		}
 		now := mw.TimeNow(ctx)
@@ -209,6 +314,10 @@ func (mw *JWTAuth) RefreshHandler(ctx context.Context) http.Handler {
 			mw.Unauthorized(ctx, w, http.StatusForbidden)
 			return
 		}
+		if token_type, ok := claims["token_type"]; !ok || token_type != "refresh_token" {
+			mw.Unauthorized(ctx, w, http.StatusForbidden)
+			return
+		}
 
 		now := mw.TimeNowFunc(ctx)
 
@@ -235,11 +344,11 @@ func (mw *JWTAuth) RefreshHandler(ctx context.Context) http.Handler {
 // Callback function that should perform the authentication of the user based on userID and
 // password. Must return true on success, false on failure. Required.
 // Option return user id, if so, user id will be stored in Claim Array.
-func (mw *JWTAuth) Authenticator(ctx context.Context, r *http.Request) (clientId string, pass bool) {
+func (mw *JWTAuth) Authenticator(ctx context.Context, password *ClientPassword) (pass bool) {
 	if mw.AuthenticatorFunc != nil {
-		return mw.AuthenticatorFunc(ctx, r)
+		return mw.AuthenticatorFunc(ctx, password)
 	}
-	return "", true
+	return true
 }
 
 // Callback function that should perform the authorization of the authenticated user. Called
@@ -258,16 +367,16 @@ func (mw *JWTAuth) Authorizator(ctx context.Context, claims jwt.MapClaims, w htt
 // Note that the payload is not encrypted.
 // The attributes mentioned on jwt.io can't be used as keys for the map.
 // Optional, by default no additional data will be set.
-func (mw *JWTAuth) Payload(ctx context.Context, clientId string) map[string]interface{} {
-	if mw.PayloadFunc != nil {
-		return mw.PayloadFunc(ctx, clientId)
+func (mw *JWTAuth) JWTExtra(ctx context.Context, clientId string) map[string]interface{} {
+	if mw.JWTExtraFunc != nil {
+		return mw.JWTExtraFunc(ctx, clientId)
 	}
 	return nil
 }
 
 // show 401 UnauthorizedFunc error.
 func (mw *JWTAuth) Unauthorized(ctx context.Context, w http.ResponseWriter, statusCode int) {
-	jwtAuth := NewJWTAuthenticate(mw.Realm, mw.Schema)
+	jwtAuth := NewJWTAuthenticate(mw.Realm, mw.Schema())
 	jwtAuth.WriteHTTPWithStatusCode(w, statusCode)
 
 	if mw.UnauthorizedFunc != nil {
@@ -287,40 +396,87 @@ func (mw *JWTAuth) TimeNow(ctx context.Context) time.Time {
 	return time.Now()
 }
 
+type Claims struct {
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.1
+	jwt.StandardClaims
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.2
+	PublicClaims jwt.MapClaims
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.3
+	PrivateClaims jwt.MapClaims
+}
+
+func (c *Claims) MarshalJSON() ([]byte, error) {
+	var vs []interface{}
+
+	if len(c.PublicClaims) > 0 {
+		vs = append(vs, c.PublicClaims)
+	}
+
+	if len(c.PrivateClaims) > 0 {
+		vs = append(vs, c.PrivateClaims)
+	}
+	return json_.MarshalConcat(c.StandardClaims, vs...)
+}
+
+func (c *Claims) UnmarshalJSON(data []byte) error {
+	return json_.UnmarshalConcat(data, &c.StandardClaims, &c.PublicClaims, &c.PrivateClaims)
+}
+
+func (c *Claims) ToMapClaims() (mapClaims jwt.MapClaims, err error) {
+	buf, err := c.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(buf, &mapClaims); err != nil {
+		return nil, err
+	}
+	return mapClaims, err
+}
+
 // generateTokens method that clients can use to get a jwt token pair.
-func (mw *JWTAuth) generateTokens(now time.Time, claims jwt.MapClaims, genRefreshToken bool) (accessToken, refreshToken string, accessTokenExpireIn time.Time, err error) {
+func (mw *JWTAuth) generateTokens(now time.Time, extraClaims jwt.MapClaims, genRefreshToken bool) (accessToken, refreshToken string, accessTokenExpireIn time.Time, err error) {
+	claims := Claims{}
+	claims.PrivateClaims = map[string]interface{}{}
+	// append extraClaims as privateClaims
+	for k, v := range extraClaims {
+		claims.PrivateClaims[k] = v
+	}
+
 	accessExpireIn := now.Add(mw.AccessExpireIn)
 	refreshExpireIn := now.Add(mw.RefreshExpireIn)
-	mw.Scheme.Claims = claims
 
-	if claims[ClaimsIssuer] == "" {
-		claims[ClaimsIssuer] = defaultIssuer
+	if mw.AccessExpireIn > 0 {
+		claims.ExpiresAt = accessExpireIn.Unix()
 	}
-	if claims[ClaimsSubject] == "" {
-		claims[ClaimsSubject] = defaultSubject
-	}
-	if claims[ClaimsAudience] == "" {
-		claims[ClaimsAudience] = defaultAudience
-	}
-	claims[ClaimsNotBefore] = now.Add(-1 * time.Second).Unix()
-	claims[ClaimsIssuedAt] = now.Unix()
-
-	if genRefreshToken && refreshExpireIn != (time.Time{}) {
-		claims[ClaimsExpirationTime] = refreshExpireIn.Unix()
-		claims[ClaimsJWTID] = auth.UUID()
+	claims.NotBefore = now.Add(-1 * time.Second).Unix()
+	claims.IssuedAt = now.Unix()
+	if genRefreshToken && mw.RefreshExpireIn > 0 {
+		claims.ExpiresAt = refreshExpireIn.Unix()
+		claims.Id = auth.UUID()
+		claims.PrivateClaims["token_type"] = "refresh_token"
 		// Refresh Token
+		mw.Scheme.Claims, err = claims.ToMapClaims()
+		if err != nil {
+			return "", "", now, err
+		}
 		refreshToken, err = mw.Scheme.RefreshToken()
 		if err != nil {
-			return "", "", time.Now(), err
+			return "", "", now, err
 		}
 	}
 
 	// Access Token
-	claims[ClaimsExpirationTime] = accessExpireIn.Unix()
-	claims[ClaimsJWTID] = auth.UUID()
+	claims.ExpiresAt = accessExpireIn.Unix()
+	claims.Id = auth.UUID()
+	claims.PrivateClaims["token_type"] = "access_token"
+
+	mw.Scheme.Claims, err = claims.ToMapClaims()
+	if err != nil {
+		return "", "", now, err
+	}
 	accessToken, err = mw.Scheme.RefreshToken()
 	if err != nil {
-		return "", "", time.Now(), err
+		return "", "", now, err
 	}
 	return accessToken, refreshToken, accessExpireIn, nil
 }
