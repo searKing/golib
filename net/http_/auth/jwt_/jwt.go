@@ -243,12 +243,12 @@ func RetrieveClientPassword(ctx context.Context, r *http.Request) (*ClientPasswo
 		return &cp, nil
 	default:
 		vars := r.URL.Query()
-		clientIds := vars["client_id"]
-		if len(clientIds) == 0 {
+		clientIds, ok := vars["client_id"]
+		if !ok || len(clientIds) == 0 {
 			return nil, errors.New("missing client_id")
 		}
-		clientSecrets := vars["client_secret"]
-		if len(clientSecrets) == 0 {
+		clientSecrets, ok := vars["client_secret"]
+		if !ok || len(clientSecrets) == 0 {
 			return nil, errors.New("missing client_secret")
 
 		}
