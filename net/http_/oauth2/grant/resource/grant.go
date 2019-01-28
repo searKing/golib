@@ -6,10 +6,6 @@ import "github.com/searKing/golib/net/http_/oauth2/grant/accesstoken"
 // The method through which the client obtains the resource owner
 // credentials is beyond the scope of this specification. The client
 // MUST discard the credentials once an access token has been obtained.
-type AuthorizationRequest struct {
-}
-type AuthorizationResponse struct {
-}
 
 // rfc6749 4.3.2
 // POST /token HTTP/1.1
