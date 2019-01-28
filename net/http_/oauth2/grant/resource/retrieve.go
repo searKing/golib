@@ -1,4 +1,4 @@
-package authorize
+package resource
 
 import (
 	"context"
@@ -42,10 +42,10 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 			return nil, err
 		}
 		return &AccessTokenRequest{
-			GrantType:   vals.Get("grant_type"),
-			Code:        vals.Get("code"),
-			RedirectUri: vals.Get("redirect_uri"),
-			ClientId:    vals.Get("client_id"),
+			GrantType: vals.Get("grant_type"),
+			Username:  vals.Get("username"),
+			Password:  vals.Get("password"),
+			Scope:     vals.Get("scope"),
 		}, nil
 	case "application/json":
 		var req AccessTokenRequest
@@ -60,23 +60,26 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 		if !ok || len(grantTypes) == 0 {
 			return nil, errors.New("missing grant_type")
 		}
-		codes, ok := vars["code"]
-		if !ok || len(codes) == 0 {
-			return nil, errors.New("missing code")
+		usernames, ok := vars["username"]
+		if !ok || len(usernames) == 0 {
+			return nil, errors.New("missing username")
 		}
-		redirectUris, ok := vars["redirect_uri"]
-		if !ok || len(redirectUris) == 0 {
-			return nil, errors.New("missing redirect_uri")
+		passwords, ok := vars["password"]
+		if !ok || len(passwords) == 0 {
+			return nil, errors.New("missing password")
 		}
-		clientIds, ok := vars["client_id"]
-		if !ok || len(clientIds) == 0 {
-			return nil, errors.New("missing client_id")
+		getValue := func(key string) string {
+			scopes, ok := vars["scope"]
+			if !ok || len(passwords) == 0 {
+				return ""
+			}
+			return scopes[0]
 		}
 		return &AccessTokenRequest{
-			GrantType:   grantTypes[0],
-			Code:        codes[0],
-			RedirectUri: redirectUris[0],
-			ClientId:    clientIds[0],
+			GrantType: grantTypes[0],
+			Username:  usernames[0],
+			Password:  passwords[0],
+			Scope:     getValue("scope"),
 		}, nil
 	}
 }

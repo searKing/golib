@@ -1,4 +1,4 @@
-package implict
+package grant
 
 import (
 	"context"
@@ -12,6 +12,10 @@ import (
 	"net/url"
 )
 
+// rfc6749 4.1.1
+// GET /authorize?response_type=code&client_id=s6BhdRkqt3&state=xyz
+//        &redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb HTTP/1.1
+//    Host: server.example.com
 // rfc6749 4.2.1
 // GET /authorize?response_type=token&client_id=s6BhdRkqt3&state=xyz
 //		 &redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb HTTP/1.1
@@ -77,5 +81,45 @@ func RetrieveAuthorizationRequest(ctx context.Context, r *http.Request) (*Author
 			State:        getVal("state"),
 		}, nil
 
+	}
+}
+func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (grantType string, body []byte, err error) {
+	defer r.Body.Close()
+
+	// rfc6749 2.3.1
+	// The client constructs the request URI by adding the following
+	// parameters to the query component of the authorization endpoint URI
+	// using the "application/x-www-form-urlencoded" format, per Appendix B:
+	// Alternatively, the authorization server MAY support including the
+	// client credentials in the request-body using the following
+	// parameters
+	body, err = ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		return "", nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
+	}
+	content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	switch content {
+	case "application/x-www-form-urlencoded", "text/plain":
+		vals, err := url.ParseQuery(string(body))
+		if err != nil {
+			return "", body, err
+		}
+		return vals.Get("grant_type"), body, nil
+	case "application/json":
+		var req struct {
+			GrantType string `json:"grant_type"`
+		}
+		if err = json.Unmarshal(body, &req); err != nil {
+
+			return "", body, err
+		}
+		return req.GrantType, body, nil
+	default:
+		vars := r.URL.Query()
+		grantTypes, ok := vars["grant_type"]
+		if !ok || len(grantTypes) == 0 {
+			return "", body, errors.New("missing grant_type")
+		}
+		return grantTypes[0], body, nil
 	}
 }
