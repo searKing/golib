@@ -1,10 +1,11 @@
-package resource
+package refresh
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/searKing/golib/net/http_/oauth2/access/basic"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -22,6 +23,11 @@ import (
 // &redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb
 func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTokenRequest, error) {
 	defer r.Body.Close()
+
+	credentials, err := basic.ParseCredentialsFromRequest(r)
+	if err != nil {
+		return nil, err
+	}
 
 	// rfc6749 2.3.1
 	// The client constructs the request URI by adding the following
@@ -42,10 +48,11 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 			return nil, err
 		}
 		return &AccessTokenRequest{
-			GrantType: vals.Get("grant_type"),
-			Username:  vals.Get("username"),
-			Password:  vals.Get("password"),
-			Scope:     vals.Get("scope"),
+			GrantType:    vals.Get("grant_type"),
+			RefreshToken: vals.Get("refresh_token"),
+			Scope:        vals.Get("scope"),
+			UserID:       credentials.UserID,
+			Password:     credentials.Password,
 		}, nil
 	case "application/json":
 		var req AccessTokenRequest
@@ -53,6 +60,8 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 
 			return nil, err
 		}
+		req.UserID = credentials.UserID
+		req.Password = credentials.Password
 		return &req, nil
 	default:
 		vars := r.URL.Query()
@@ -60,13 +69,9 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 		if !ok || len(grantTypes) == 0 {
 			return nil, errors.New("missing grant_type")
 		}
-		usernames, ok := vars["username"]
-		if !ok || len(usernames) == 0 {
-			return nil, errors.New("missing username")
-		}
-		passwords, ok := vars["password"]
-		if !ok || len(passwords) == 0 {
-			return nil, errors.New("missing password")
+		refreshTokens, ok := vars["refresh_token"]
+		if !ok || len(refreshTokens) == 0 {
+			return nil, errors.New("missing refresh_token")
 		}
 		getValue := func(key string) string {
 			vals, ok := vars[key]
@@ -76,10 +81,11 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 			return vals[0]
 		}
 		return &AccessTokenRequest{
-			GrantType: grantTypes[0],
-			Username:  usernames[0],
-			Password:  passwords[0],
-			Scope:     getValue("scope"),
+			GrantType:    grantTypes[0],
+			RefreshToken: refreshTokens[0],
+			Scope:        getValue("scope"),
+			UserID:       credentials.UserID,
+			Password:     credentials.Password,
 		}, nil
 	}
 }

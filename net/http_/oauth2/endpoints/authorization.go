@@ -6,7 +6,10 @@ import (
 	"github.com/searKing/golib/net/http_/oauth2/grant"
 	"github.com/searKing/golib/net/http_/oauth2/grant/accesstoken"
 	"github.com/searKing/golib/net/http_/oauth2/grant/authorize"
+	"github.com/searKing/golib/net/http_/oauth2/grant/client"
 	"github.com/searKing/golib/net/http_/oauth2/grant/implict"
+	"github.com/searKing/golib/net/http_/oauth2/grant/resource"
+	"github.com/searKing/golib/net/http_/oauth2/refresh"
 	"net/http"
 )
 
@@ -26,7 +29,10 @@ type AuthorizationEndpoint struct {
 	AuthorizationCodeGrantAuthorizationFunc func(ctx context.Context, authReq *grant.AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
 	ImplicitGrantAuthorizationFunc          func(ctx context.Context, authReq *grant.AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText)
 
-	GetAccessTokenFunc func(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText)
+	AuthorizationCodeGrantAccessTokenFunc                func(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText)
+	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *resource.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText)
+	ClientCredentialsGrantAccessTokenFunc                func(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText)
+	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *refresh.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText)
 }
 
 func (e *AuthorizationEndpoint) AuthorizationHandler(ctx context.Context) http.Handler {
@@ -130,7 +136,11 @@ func (e *AuthorizationEndpoint) GetAccessTokenHandler(ctx context.Context) http.
 			return
 		}
 		if grantType == "password" {
-			e.ImplicitGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
+			e.ResourceOwnerPasswordCredentialsGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
+			return
+		}
+		if grantType == "client_credentials" {
+			e.ClientCredentialsGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
 			return
 		}
 		e.UnknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
@@ -146,21 +156,10 @@ func (e *AuthorizationEndpoint) AuthorizationCodeGrantAccessTokenHandler(ctx con
 		}
 		// rfc6749 4.1.3
 		if accessTokenReq.GrantType != "authorization_code" {
-			authResp := accesstoken.ErrorResponse{
-				Error:            accesstoken.ErrorTextInvalidGrant,
-				ErrorDescription: accesstoken.ErrorTextInvalidGrant.Description(),
-				ErrorUri:         "https://tools.ietf.org/pdf/rfc6749.pdf",
-			}
-			w.WriteHeader(http.StatusBadRequest)
-			authRespBytes, err := json.Marshal(&authResp)
-			if err != nil {
-				return
-			}
-			w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-			w.Write([]byte(authRespBytes))
+			e.UnknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
-		accessTokenResp, errCode := e.GetAccessToken(ctx, accessTokenReq)
+		accessTokenResp, errCode := e.AuthorizationCodeGrantAccessToken(ctx, accessTokenReq)
 		if errCode != "" {
 			accessTokenErrResp := accesstoken.ErrorResponse{
 				Error:            errCode,
@@ -193,30 +192,19 @@ func (e *AuthorizationEndpoint) AuthorizationCodeGrantAccessTokenHandler(ctx con
 		return
 	})
 }
-func (e *AuthorizationEndpoint) ImplicitGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+func (e *AuthorizationEndpoint) ResourceOwnerPasswordCredentialsGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		accessTokenReq, err := authorize.RetrieveAccessTokenRequest(ctx, r)
+		accessTokenReq, err := resource.RetrieveAccessTokenRequest(ctx, r)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		// rfc6749 4.1.3
-		if accessTokenReq.GrantType != "authorization_code" {
-			authResp := accesstoken.ErrorResponse{
-				Error:            accesstoken.ErrorTextInvalidGrant,
-				ErrorDescription: accesstoken.ErrorTextInvalidGrant.Description(),
-				ErrorUri:         "https://tools.ietf.org/pdf/rfc6749.pdf",
-			}
-			w.WriteHeader(http.StatusBadRequest)
-			authRespBytes, err := json.Marshal(&authResp)
-			if err != nil {
-				return
-			}
-			w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-			w.Write([]byte(authRespBytes))
+		if accessTokenReq.GrantType != "password" {
+			e.UnknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
-		accessTokenResp, errCode := e.GetAccessToken(ctx, accessTokenReq)
+		accessTokenResp, errCode := e.ResourceOwnerPasswordCredentialsGrantAccessToken(ctx, accessTokenReq)
 		if errCode != "" {
 			accessTokenErrResp := accesstoken.ErrorResponse{
 				Error:            errCode,
@@ -249,6 +237,63 @@ func (e *AuthorizationEndpoint) ImplicitGrantAccessTokenHandler(ctx context.Cont
 		return
 	})
 }
+func (e *AuthorizationEndpoint) ClientCredentialsGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accessTokenReq, err := client.RetrieveAccessTokenRequest(ctx, r)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// rfc6749 4.4.2
+		if accessTokenReq.GrantType != "client_credentials" {
+			e.UnknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
+			return
+		}
+		accessTokenResp, errCode := e.ClientCredentialsGrantAccessToken(ctx, accessTokenReq)
+		if errCode != "" {
+			e.AccessTokenRejected(errCode)
+			return
+		}
+		accessTokenRespBytes, err := json.Marshal(&accessTokenResp)
+		if err != nil {
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Write(accessTokenRespBytes)
+		return
+	})
+}
+func (e *AuthorizationEndpoint) RefreshTokenGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accessTokenReq, err := refresh.RetrieveAccessTokenRequest(ctx, r)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// rfc6749 4.4.2
+		if accessTokenReq.GrantType != "refresh_token" {
+			e.UnknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
+			return
+		}
+		accessTokenResp, errCode := e.RefreshTokenGrantAccessToken(ctx, accessTokenReq)
+		if errCode != "" {
+			e.AccessTokenRejected(errCode)
+			return
+		}
+		accessTokenRespBytes, err := json.Marshal(&accessTokenResp)
+		if err != nil {
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Write(accessTokenRespBytes)
+		return
+	})
+}
+
 func (e *AuthorizationEndpoint) UnknownGrantAccessTokenHandler(ctx context.Context) http.Handler {
 	return e.AccessTokenRejected(accesstoken.ErrorTextInvalidRequest)
 }
@@ -273,11 +318,15 @@ func (e *AuthorizationEndpoint) AuthorizationRejected(authReq *grant.Authorizati
 func (e *AuthorizationEndpoint) AccessTokenRejected(err accesstoken.ErrorText) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authResp := accesstoken.ErrorResponse{
-			Error:            accesstoken.ErrorTextInvalidGrant,
-			ErrorDescription: accesstoken.ErrorTextInvalidGrant.Description(),
+			Error:            err,
+			ErrorDescription: err.Description(),
 			ErrorUri:         "https://tools.ietf.org/pdf/rfc6749.pdf",
 		}
-		w.WriteHeader(http.StatusBadRequest)
+		statusCode := http.StatusBadRequest
+		if authResp.Error == accesstoken.ErrorTextInvalidClient {
+			statusCode = http.StatusUnauthorized
+		}
+		w.WriteHeader(statusCode)
 		authRespBytes, err := json.Marshal(&authResp)
 		if err != nil {
 			return
@@ -302,9 +351,30 @@ func (e *AuthorizationEndpoint) ImplicitGrantAuthorization(ctx context.Context, 
 	// UnImplemented
 	return nil, implict.ErrorTextUnsupportedResponseType
 }
-func (e *AuthorizationEndpoint) GetAccessToken(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText) {
-	if e.GetAccessTokenFunc != nil {
-		return e.GetAccessTokenFunc(ctx, tokenReq)
+func (e *AuthorizationEndpoint) AuthorizationCodeGrantAccessToken(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText) {
+	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
+		return e.AuthorizationCodeGrantAccessTokenFunc(ctx, tokenReq)
+	}
+	// UnImplemented
+	return nil, accesstoken.ErrorTextUnsupportedGrantType
+}
+func (e *AuthorizationEndpoint) ResourceOwnerPasswordCredentialsGrantAccessToken(ctx context.Context, tokenReq *resource.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText) {
+	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
+		return e.ResourceOwnerPasswordCredentialsGrantAccessTokenFunc(ctx, tokenReq)
+	}
+	// UnImplemented
+	return nil, accesstoken.ErrorTextUnsupportedGrantType
+}
+func (e *AuthorizationEndpoint) ClientCredentialsGrantAccessToken(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText) {
+	if e.ClientCredentialsGrantAccessTokenFunc != nil {
+		return e.ClientCredentialsGrantAccessTokenFunc(ctx, tokenReq)
+	}
+	// UnImplemented
+	return nil, accesstoken.ErrorTextUnsupportedGrantType
+}
+func (e *AuthorizationEndpoint) RefreshTokenGrantAccessToken(ctx context.Context, tokenReq *refresh.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulResponse, err accesstoken.ErrorText) {
+	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
+		return e.RefreshTokenGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType

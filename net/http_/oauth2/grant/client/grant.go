@@ -1,19 +1,8 @@
 package client
 
-import (
-	"github.com/searKing/golib/net/http_/oauth2/grant/accesstoken"
-	"github.com/searKing/golib/net/http_/oauth2/grant/authorize"
-)
-
 // rfc6749 4.4.1
 // Since the client authentication is used as the authorization grant,
 // no additional authorization request is needed.
-type AuthorizationRequest struct {
-	authorize.AuthorizationRequest
-}
-type AuthorizationResponse struct {
-	authorize.AuthorizationResponse
-}
 
 // rfc6749 4.4.2
 // POST /token HTTP/1.1
@@ -24,6 +13,8 @@ type AuthorizationResponse struct {
 type AccessTokenRequest struct {
 	GrantType string `json:"grant_type"`
 	Scope     string `json:"scope,omitempty"`
+	UserID    string `json:"-"`
+	Password  string `json:"-"`
 }
 
 // rfc6749 4.4.3
@@ -38,9 +29,5 @@ type AccessTokenRequest struct {
 //	"expires_in":3600,
 //	"example_parameter":"example_value"
 // }
-type AccessTokenResponse struct {
-	accesstoken.SuccessfulResponse
-}
-type AccessTokenErrorResponse struct {
-	accesstoken.ErrorResponse
-}
+//type AccessTokenResponse accesstoken.SuccessfulResponse
+//type AccessTokenErrorResponse accesstoken.ErrorResponse
