@@ -35,10 +35,10 @@ type AccessTokenRequest struct {
 //	"example_parameter":"example_value"
 // }
 type AccessTokenResponse struct {
-	accesstoken.SuccessfulResponse
+	accesstoken.SuccessfulIssueResponse
 }
 type AccessTokenErrorResponse struct {
-	accesstoken.ErrorResponse
+	accesstoken.ErrorIssueResponse
 }
 
 type ErrorText string

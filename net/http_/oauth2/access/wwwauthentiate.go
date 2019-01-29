@@ -11,6 +11,13 @@ type WWWAuthentiate struct {
 	Challenges []*Challenge
 }
 
+func NewWWWAuthentiate(authScheme, realm string) *WWWAuthentiate {
+	return &WWWAuthentiate{
+		Challenges: []*Challenge{
+			NewChallenge(authScheme, realm),
+		},
+	}
+}
 func ParseWWWAuthentiate(auth string) (*WWWAuthentiate, error) {
 	wwwAuthentiate := &WWWAuthentiate{}
 	for _, p := range splitChallenge(auth) {

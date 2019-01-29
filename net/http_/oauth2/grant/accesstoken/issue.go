@@ -13,7 +13,7 @@ package accesstoken
 //	"refresh_token":"tGzv3JOkF0XG5Qx2TlKWIA",
 //	"example_parameter":"example_value"
 // }
-type SuccessfulResponse struct {
+type SuccessfulIssueResponse struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int64  `json:"expires_in,omitempty"`
@@ -84,7 +84,7 @@ func (e ErrorText) Description() string {
 //	{
 //	"error":"invalid_request"
 //	}
-type ErrorResponse struct {
+type ErrorIssueResponse struct {
 	Error            ErrorText `json:"error"`
 	ErrorDescription string    `json:"error_description,omitempty"`
 	ErrorUri         string    `json:"error_uri,omitempty"`

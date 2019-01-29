@@ -15,6 +15,14 @@ type Challenge struct {
 	AuthParams []*AuthParam
 }
 
+func NewChallenge(authScheme, realm string) *Challenge {
+	return &Challenge{
+		AuthScheme: authScheme,
+		Realm:      NewRealm(realm),
+		AuthParams: nil,
+	}
+}
+
 func ParseChallenge(challenge string) (*Challenge, error) {
 	s := strings.SplitN(challenge, " ", 2)
 	if len(s) != 2 {

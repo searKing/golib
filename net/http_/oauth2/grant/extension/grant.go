@@ -15,8 +15,8 @@ type AuthorizationRequest struct {
 
 // rfc6749 4.5
 type AccessTokenResponse struct {
-	accesstoken.SuccessfulResponse
+	accesstoken.SuccessfulIssueResponse
 }
 type AccessTokenErrorResponse struct {
-	accesstoken.ErrorResponse
+	accesstoken.ErrorIssueResponse
 }

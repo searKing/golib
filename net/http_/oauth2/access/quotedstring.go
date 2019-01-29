@@ -4,6 +4,11 @@ type QuotedString struct {
 	UnquotedString string
 }
 
+func NewQuotedString(str string) *QuotedString {
+	return &QuotedString{
+		UnquotedString: str,
+	}
+}
 func ParseQuotedString(raw string) (*QuotedString, error) {
 	unquotedString, err := parseQuotedString(raw)
 	if err != nil {

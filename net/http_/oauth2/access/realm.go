@@ -9,6 +9,11 @@ type Realm struct {
 	RealmValue *QuotedString `json:"realm_value"`
 }
 
+func NewRealm(realm string) *Realm {
+	return &Realm{
+		RealmValue: NewQuotedString(realm),
+	}
+}
 func ParseRealm(realm string) (*Realm, error) {
 	s := strings.SplitN(realm, " ", 2)
 	if len(s) != 2 || s[0] != "realm" {
@@ -28,8 +33,10 @@ func ParseRealm(realm string) (*Realm, error) {
 
 func (r *Realm) String() string {
 	var b strings.Builder
-	b.WriteString("realm")
-	b.WriteRune('=')
-	b.WriteString(r.RealmValue.String())
+	if r != nil && r.RealmValue != nil {
+		b.WriteString("realm")
+		b.WriteRune('=')
+		b.WriteString(r.RealmValue.String())
+	}
 	return b.String()
 }
