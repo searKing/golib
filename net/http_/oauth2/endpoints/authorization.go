@@ -27,10 +27,10 @@ const (
 // rfc6749 3.1
 // Authorization endpoint - used by the client to obtain
 // authorization from the resource owner via user-agent redirection.
-type AuthorizationCodeGrantAuthorizationResult struct {
+type AuthorizeAuthorizationResult struct {
 	Code string `json:"code"`
 }
-type ImplicitGrantAuthorizationResult struct {
+type ImplicitAuthorizationResult struct {
 	AccessToken string    `json:"access_token"`
 	TokenType   string    `json:"token_type"`
 	ExpiresIn   time.Time `json:"expires_in,omitempty"`
@@ -46,26 +46,37 @@ type AuthorizeAccessTokenResponse struct {
 	ExpiresIn    int64  `json:"expires_in,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 }
-type ResourceAccessTokenRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Scope    string `json:"scope,omitempty"`
-}
-type ResourceAccessTokenResponse struct {
+type AccessTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int64  `json:"expires_in,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	Scope        string `json:"scope,omitempty"`
 }
+type ResourceAccessTokenRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Scope    string `json:"scope,omitempty"`
+}
+type ClientAccessTokenRequest struct {
+	Scope    string `json:"scope,omitempty"`
+	UserID   string `json:"-"`
+	Password string `json:"-"`
+}
+type RefreshAccessTokenRequest struct {
+	RefreshToken string `json:"refresh_token"`
+	Scope        string `json:"scope,omitempty"`
+	UserID       string `json:"-"`
+	Password     string `json:"-"`
+}
 type AuthorizationEndpoint struct {
-	AuthorizationCodeGrantAuthenticationFunc func(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
-	ImplicitGrantAuthenticationFunc          func(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText)
+	AuthorizationCodeGrantAuthenticationFunc func(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizeAuthorizationResult, err authorize.ErrorText)
+	ImplicitGrantAuthenticationFunc          func(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitAuthorizationResult, err implict.ErrorText)
 
 	AuthorizationCodeGrantAccessTokenFunc                func(ctx context.Context, tokenReq *AuthorizeAccessTokenRequest) (tokenResp *AuthorizeAccessTokenResponse, err accesstoken.ErrorText)
-	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *ResourceAccessTokenResponse, err accesstoken.ErrorText)
-	ClientCredentialsGrantAccessTokenFunc                func(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
-	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *refresh.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
+	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText)
+	ClientCredentialsGrantAccessTokenFunc                func(ctx context.Context, tokenReq *ClientAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText)
+	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *RefreshAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText)
 
 	AuthorizateFunc func(ctx context.Context, token *accesstoken.AccessTokenType) (err accesstoken.ErrorText)
 }
@@ -298,7 +309,7 @@ func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken
 			return
 		}
 
-		accessTokenRespBytes, err := json.Marshal(&ResourceAccessTokenResponse{
+		accessTokenRespBytes, err := json.Marshal(&AccessTokenResponse{
 			AccessToken:  accessTokenResp.AccessToken,
 			TokenType:    accessTokenResp.TokenType,
 			ExpiresIn:    accessTokenResp.ExpiresIn,
@@ -341,12 +352,27 @@ func (e *AuthorizationEndpoint) clientCredentialsGrantAccessTokenHandler(ctx con
 			e.unknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
-		accessTokenResp, errCode := e.clientCredentialsGrantAccessToken(ctx, accessTokenReq)
+		accessTokenResp, errCode := e.clientCredentialsGrantAccessToken(ctx, &ClientAccessTokenRequest{
+			Scope:    accessTokenReq.Scope,
+			UserID:   accessTokenReq.UserID,
+			Password: accessTokenReq.Password,
+		})
 		if errCode != "" {
 			e.accessTokenRejected(errCode)
 			return
 		}
-		accessTokenRespBytes, err := json.Marshal(&accessTokenResp)
+		accessTokenRespBytes, err := json.Marshal(&AccessTokenResponse{
+			AccessToken:  accessTokenResp.AccessToken,
+			TokenType:    accessTokenResp.TokenType,
+			ExpiresIn:    accessTokenResp.ExpiresIn,
+			RefreshToken: accessTokenResp.RefreshToken,
+			Scope: func() string {
+				if accessTokenReq.Scope == accessTokenResp.Scope {
+					return ""
+				}
+				return accessTokenResp.Scope
+			}(),
+		})
 		if err != nil {
 			return
 		}
@@ -369,12 +395,28 @@ func (e *AuthorizationEndpoint) refreshTokenGrantAccessTokenHandler(ctx context.
 			e.unknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
-		accessTokenResp, errCode := e.refreshTokenGrantAccessToken(ctx, accessTokenReq)
+		accessTokenResp, errCode := e.refreshTokenGrantAccessToken(ctx, &RefreshAccessTokenRequest{
+			RefreshToken: accessTokenReq.RefreshToken,
+			Scope:        accessTokenReq.Scope,
+			UserID:       accessTokenReq.UserID,
+			Password:     accessTokenReq.Password,
+		})
 		if errCode != "" {
 			e.accessTokenRejected(errCode)
 			return
 		}
-		accessTokenRespBytes, err := json.Marshal(&accessTokenResp)
+		accessTokenRespBytes, err := json.Marshal(&AccessTokenResponse{
+			AccessToken:  accessTokenResp.AccessToken,
+			TokenType:    accessTokenResp.TokenType,
+			ExpiresIn:    accessTokenResp.ExpiresIn,
+			RefreshToken: accessTokenResp.RefreshToken,
+			Scope: func() string {
+				if accessTokenReq.Scope == accessTokenResp.Scope {
+					return ""
+				}
+				return accessTokenResp.Scope
+			}(),
+		})
 		if err != nil {
 			return
 		}
@@ -448,14 +490,14 @@ func (e *AuthorizationEndpoint) authorizateRejected(err accesstoken.ErrorText) h
 	})
 }
 
-func (e *AuthorizationEndpoint) authorizationCodeGrantAuthentication(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText) {
+func (e *AuthorizationEndpoint) authorizationCodeGrantAuthentication(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizeAuthorizationResult, err authorize.ErrorText) {
 	if e.AuthorizationCodeGrantAuthenticationFunc != nil {
 		return e.AuthorizationCodeGrantAuthenticationFunc(ctx, authReq)
 	}
 	// UnImplemented
 	return nil, authorize.ErrorTextUnsupportedResponseType
 }
-func (e *AuthorizationEndpoint) implicitGrantAuthentication(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText) {
+func (e *AuthorizationEndpoint) implicitGrantAuthentication(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitAuthorizationResult, err implict.ErrorText) {
 	if e.ImplicitGrantAuthenticationFunc != nil {
 		return e.ImplicitGrantAuthenticationFunc(ctx, authReq)
 	}
@@ -469,21 +511,21 @@ func (e *AuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context.Co
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
-func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *ResourceAccessTokenResponse, err accesstoken.ErrorText) {
+func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
 	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
 		return e.ResourceOwnerPasswordCredentialsGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
-func (e *AuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText) {
+func (e *AuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context.Context, tokenReq *ClientAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
 	if e.ClientCredentialsGrantAccessTokenFunc != nil {
 		return e.ClientCredentialsGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
-func (e *AuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Context, tokenReq *refresh.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText) {
+func (e *AuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Context, tokenReq *RefreshAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
 	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
 		return e.RefreshTokenGrantAccessTokenFunc(ctx, tokenReq)
 	}
