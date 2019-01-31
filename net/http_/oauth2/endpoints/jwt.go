@@ -10,10 +10,7 @@ import (
 	"github.com/searKing/golib/net/http_/auth/jwt_"
 	"github.com/searKing/golib/net/http_/oauth2/grant/accesstoken"
 	"github.com/searKing/golib/net/http_/oauth2/grant/authorize"
-	"github.com/searKing/golib/net/http_/oauth2/grant/client"
 	"github.com/searKing/golib/net/http_/oauth2/grant/implict"
-	"github.com/searKing/golib/net/http_/oauth2/grant/resource"
-	"github.com/searKing/golib/net/http_/oauth2/refresh"
 	"net/http"
 	"time"
 )
@@ -53,13 +50,13 @@ type JWTAuthorizationEndpoint struct {
 	// Optional, defaults to 0 meaning not refreshable.
 	RefreshExpireIn time.Duration `json:"refresh_expire_in,omitempty"`
 
-	AuthorizationCodeGrantAuthorizationFunc func(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
+	AuthorizationCodeGrantAuthorizationFunc func(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizeAuthorizationResult, err authorize.ErrorText)
 	ImplicitGrantAuthorizationFunc          func(ctx context.Context, authReq *AuthorizationRequest) (res *JWTImplicitGrantAuthorizationResult, err implict.ErrorText)
 
-	AuthorizationCodeGrantAccessTokenFunc                func(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
-	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *resource.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
-	ClientCredentialsGrantAccessTokenFunc                func(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
-	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *JWTRefreshToken) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
+	AuthorizationCodeGrantAccessTokenFunc                func(ctx context.Context, tokenReq *AuthorizeAccessTokenRequest) (tokenResp *AuthorizeAccessTokenResponse, err accesstoken.ErrorText)
+	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText)
+	ClientCredentialsGrantAccessTokenFunc                func(ctx context.Context, tokenReq *ClientAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText)
+	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *JWTRefreshToken) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText)
 
 	AuthorizateFunc func(ctx context.Context, claims jwt.MapClaims) (err accesstoken.ErrorText)
 	// TimeNowFunc provides the current time. You can override it to use another time value.
@@ -105,7 +102,7 @@ func (e *JWTAuthorizationEndpoint) AuthorizateHandler(ctx context.Context) http.
 	})
 }
 
-func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAuthorization(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText) {
+func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAuthorization(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizeAuthorizationResult, err authorize.ErrorText) {
 	if e.AuthorizationCodeGrantAuthorizationFunc != nil {
 		return e.AuthorizationCodeGrantAuthorizationFunc(ctx, authReq)
 	}
@@ -113,7 +110,7 @@ func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAuthorization(ctx conte
 	return nil, authorize.ErrorTextUnsupportedResponseType
 }
 
-func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, errText implict.ErrorText) {
+func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitAuthorizationResult, errText implict.ErrorText) {
 	if e.ImplicitGrantAuthorizationFunc == nil {
 		// UnImplemented
 		return nil, implict.ErrorTextUnsupportedResponseType
@@ -140,28 +137,28 @@ func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Contex
 	// The content of the header should look like the following:
 	//
 	//	Authorization: Bearer <token>
-	return &ImplicitGrantAuthorizationResult{
+	return &ImplicitAuthorizationResult{
 		AccessToken: accessToken,
 		TokenType:   "bearer",
 		ExpiresIn:   accessTokenExpireIn,
 		Scope:       jwtAuthResp.Scope,
 	}, ""
 }
-func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText) {
+func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context.Context, tokenReq *AuthorizeAccessTokenRequest) (tokenResp *AuthorizeAccessTokenResponse, err accesstoken.ErrorText) {
 	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
 		return e.AuthorizationCodeGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
-func (e *JWTAuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken(ctx context.Context, tokenReq *resource.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText) {
+func (e *JWTAuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
 	if e.ResourceOwnerPasswordCredentialsGrantAccessTokenFunc != nil {
 		return e.ResourceOwnerPasswordCredentialsGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
-func (e *JWTAuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText) {
+func (e *JWTAuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context.Context, tokenReq *ClientAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
 	if e.ClientCredentialsGrantAccessTokenFunc != nil {
 		return e.ClientCredentialsGrantAccessTokenFunc(ctx, tokenReq)
 	}
@@ -169,8 +166,8 @@ func (e *JWTAuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
 
-func (e *JWTAuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Context, tokenReq *refresh.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, errText accesstoken.ErrorText) {
-	if tokenReq == nil || tokenReq.GrantType != "refresh_token" {
+func (e *JWTAuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Context, tokenReq *RefreshAccessTokenRequest) (tokenResp *AccessTokenResponse, errText accesstoken.ErrorText) {
+	if tokenReq == nil {
 		return nil, accesstoken.ErrorTextUnsupportedGrantType
 	}
 	jwtToken := tokenReq.RefreshToken
