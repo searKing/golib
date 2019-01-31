@@ -31,10 +31,10 @@ type AuthorizeAuthorizationResult struct {
 	Code string `json:"code"`
 }
 type ImplicitAuthorizationResult struct {
-	AccessToken string    `json:"access_token"`
-	TokenType   string    `json:"token_type"`
-	ExpiresIn   time.Time `json:"expires_in,omitempty"`
-	Scope       string    `json:"scope,omitempty"`
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int64  `json:"expires_in,omitempty"`
+	Scope       string `json:"scope,omitempty"`
 }
 type AuthorizeAccessTokenRequest struct {
 	Code     string `json:"code"`
@@ -193,7 +193,7 @@ func (e *AuthorizationEndpoint) implictGrantAuthenticationHandler(ctx context.Co
 		accessTokenResp := &implict.AccessTokenResponse{
 			AccessToken: authRes.AccessToken,
 			TokenType:   authRes.TokenType,
-			ExpiresIn:   authRes.ExpiresIn.Format(defaultTimeFormat),
+			ExpiresIn:   authRes.ExpiresIn,
 			Scope: func() string {
 				// rfc6749 4.2.2
 				if authRes.Scope == authReq.Scope {

@@ -1,6 +1,9 @@
 package implict
 
-import "net/url"
+import (
+	"net/url"
+	"strconv"
+)
 
 // rfc6749 4.2.1
 //	GET /authorize?response_type=token&client_id=s6BhdRkqt3&state=xyz
@@ -15,7 +18,7 @@ import "net/url"
 type AccessTokenResponse struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
-	ExpiresIn   string `json:"expires_in,omitempty"`
+	ExpiresIn   int64  `json:"expires_in,omitempty"`
 	Scope       string `json:"scope,omitempty"`
 	State       string `json:"state,omitempty" options:"pair"`
 }
@@ -26,8 +29,8 @@ func (resp *AccessTokenResponse) UrlEncode() string {
 		"token_type":   []string{resp.TokenType},
 	}
 
-	if resp.ExpiresIn != "" {
-		val["expires_in"] = []string{resp.ExpiresIn}
+	if resp.ExpiresIn != 0 {
+		val["expires_in"] = []string{strconv.Itoa(int(resp.ExpiresIn))}
 	}
 	if resp.Scope != "" {
 		val["scope"] = []string{resp.Scope}
