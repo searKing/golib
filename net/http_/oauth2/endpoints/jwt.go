@@ -2,10 +2,12 @@ package endpoints
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/searKing/golib/crypto/auth"
+	"github.com/searKing/golib/encoding/json_"
 	"github.com/searKing/golib/net/http_/auth/jwt_"
-	"github.com/searKing/golib/net/http_/oauth2/grant"
 	"github.com/searKing/golib/net/http_/oauth2/grant/accesstoken"
 	"github.com/searKing/golib/net/http_/oauth2/grant/authorize"
 	"github.com/searKing/golib/net/http_/oauth2/grant/client"
@@ -15,6 +17,30 @@ import (
 	"net/http"
 	"time"
 )
+
+type JWTAuthorizationCodeGrantAuthorizationResult struct {
+	Code string `json:"code"`
+}
+
+type JWTImplicitGrantAuthorizationResult struct {
+	CustomClaims jwt.MapClaims `json:"custom_claims"`
+	// Duration that a jwt access-token is valid. Optional, defaults to one hour.
+	AccessExpireIn time.Duration `json:"access_expire_in,omitempty"`
+	// Duration that a jwt refresh-token is valid. Optional, defaults to seven days.
+	// This field allows clients to refresh their token until MaxRefresh has passed.
+	// Note that clients can refresh their token in the last moment of MaxRefresh.
+	// This means that the maximum validity timespan for a token is MaxRefresh + Timeout.
+	// Optional, defaults to 0 meaning not refreshable.
+	RefreshExpireIn time.Duration `json:"refresh_expire_in,omitempty"`
+	Scope           string        `json:"scope,omitempty"`
+}
+
+type JWTRefreshToken struct {
+	Claims   jwt.MapClaims
+	Scope    string `json:"scope,omitempty"`
+	UserID   string `json:"-"`
+	Password string `json:"-"`
+}
 
 type JWTAuthorizationEndpoint struct {
 	Key *jwt_.AuthKey `options:"required"`
@@ -27,13 +53,13 @@ type JWTAuthorizationEndpoint struct {
 	// Optional, defaults to 0 meaning not refreshable.
 	RefreshExpireIn time.Duration `json:"refresh_expire_in,omitempty"`
 
-	AuthorizationCodeGrantAuthorizationFunc func(ctx context.Context, authReq *grant.AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
-	ImplicitGrantAuthorizationFunc          func(ctx context.Context, authReq *grant.AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText)
+	AuthorizationCodeGrantAuthorizationFunc func(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
+	ImplicitGrantAuthorizationFunc          func(ctx context.Context, authReq *AuthorizationRequest) (res *JWTImplicitGrantAuthorizationResult, err implict.ErrorText)
 
 	AuthorizationCodeGrantAccessTokenFunc                func(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
 	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *resource.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
 	ClientCredentialsGrantAccessTokenFunc                func(ctx context.Context, tokenReq *client.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
-	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *RefreshToken) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
+	RefreshTokenGrantAccessTokenFunc                     func(ctx context.Context, tokenReq *JWTRefreshToken) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
 
 	AuthorizateFunc func(ctx context.Context, claims jwt.MapClaims) (err accesstoken.ErrorText)
 	// TimeNowFunc provides the current time. You can override it to use another time value.
@@ -79,19 +105,47 @@ func (e *JWTAuthorizationEndpoint) AuthorizateHandler(ctx context.Context) http.
 	})
 }
 
-func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAuthorization(ctx context.Context, authReq *grant.AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText) {
+func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAuthorization(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText) {
 	if e.AuthorizationCodeGrantAuthorizationFunc != nil {
 		return e.AuthorizationCodeGrantAuthorizationFunc(ctx, authReq)
 	}
 	// UnImplemented
 	return nil, authorize.ErrorTextUnsupportedResponseType
 }
-func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Context, authReq *grant.AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText) {
-	if e.ImplicitGrantAuthorizationFunc != nil {
-		return e.ImplicitGrantAuthorizationFunc(ctx, authReq)
+
+func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, errText implict.ErrorText) {
+	if e.ImplicitGrantAuthorizationFunc == nil {
+		// UnImplemented
+		return nil, implict.ErrorTextUnsupportedResponseType
 	}
-	// UnImplemented
-	return nil, implict.ErrorTextUnsupportedResponseType
+
+	jwtAuthResp, errText := e.ImplicitGrantAuthorizationFunc(ctx, authReq)
+	if errText != "" {
+		return nil, errText
+	}
+	gen := &JWTGenerator{
+		Key:             e.Key,
+		AccessExpireIn:  jwtAuthResp.AccessExpireIn,
+		RefreshExpireIn: jwtAuthResp.RefreshExpireIn,
+	}
+	accessToken, _, accessTokenExpireIn, err := gen.GenerateTokens(e.TimeNow(ctx), jwtAuthResp.CustomClaims, false)
+	if err != nil {
+		return nil, implict.ErrorTextServerError
+	}
+
+	// https://jwt.io/introduction/
+	// Whenever the user wants to access a protected route or resource,
+	// the user agent should send the JWT,
+	// typically in the Authorization header using the Bearer schema.
+	// The content of the header should look like the following:
+	//
+	//	Authorization: Bearer <token>
+	return &ImplicitGrantAuthorizationResult{
+		AccessToken: accessToken,
+		TokenType:   "bearer",
+		ExpiresIn:   accessTokenExpireIn,
+		Scope:       jwtAuthResp.Scope,
+	}, ""
 }
 func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText) {
 	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
@@ -113,13 +167,6 @@ func (e *JWTAuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context
 	}
 	// UnImplemented
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
-}
-
-type RefreshToken struct {
-	Claims   jwt.MapClaims
-	Scope    string `json:"scope,omitempty"`
-	UserID   string `json:"-"`
-	Password string `json:"-"`
 }
 
 func (e *JWTAuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Context, tokenReq *refresh.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, errText accesstoken.ErrorText) {
@@ -149,7 +196,7 @@ func (e *JWTAuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Cont
 	}
 
 	if e.RefreshTokenGrantAccessTokenFunc != nil {
-		return e.RefreshTokenGrantAccessTokenFunc(ctx, &RefreshToken{
+		return e.RefreshTokenGrantAccessTokenFunc(ctx, &JWTRefreshToken{
 			Claims:   claims,
 			Scope:    tokenReq.Scope,
 			UserID:   tokenReq.UserID,
@@ -200,4 +247,116 @@ func (e *JWTAuthorizationEndpoint) TimeNow(ctx context.Context) time.Time {
 		return e.TimeNowFunc(ctx)
 	}
 	return time.Now()
+}
+
+type Claims struct {
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.1
+	jwt.StandardClaims
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.2
+	PublicClaims jwt.MapClaims
+	// See http://tools.ietf.org/html/draft-jones-json-web-token-10#section-4.3
+	PrivateClaims jwt.MapClaims
+}
+
+func (c *Claims) MarshalJSON() ([]byte, error) {
+	var vs []interface{}
+
+	if len(c.PublicClaims) > 0 {
+		vs = append(vs, c.PublicClaims)
+	}
+
+	if len(c.PrivateClaims) > 0 {
+		vs = append(vs, c.PrivateClaims)
+	}
+	return json_.MarshalConcat(c.StandardClaims, vs...)
+}
+
+func (c *Claims) UnmarshalJSON(data []byte) error {
+	return json_.UnmarshalConcat(data, &c.StandardClaims, &c.PublicClaims, &c.PrivateClaims)
+}
+
+func (c *Claims) ToMapClaims() (mapClaims jwt.MapClaims, err error) {
+	buf, err := c.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(buf, &mapClaims); err != nil {
+		return nil, err
+	}
+	return mapClaims, err
+}
+
+type JWTGenerator struct {
+	Key *jwt_.AuthKey
+	// Duration that a jwt access-token is valid. Optional, defaults to one hour.
+	AccessExpireIn time.Duration
+	// Duration that a jwt refresh-token is valid. Optional, defaults to seven days.
+	// This field allows clients to refresh their token until MaxRefresh has passed.
+	// Note that clients can refresh their token in the last moment of MaxRefresh.
+	// This means that the maximum validity timespan for a token is MaxRefresh + Timeout.
+	// Optional, defaults to 0 meaning not refreshable.
+	RefreshExpireIn time.Duration
+}
+
+// generateTokens method that clients can use to get a jwt token pair.
+func (g *JWTGenerator) GenerateTokens(now time.Time, extraClaims jwt.MapClaims, genRefreshToken bool) (accessToken, refreshToken string, accessTokenExpireIn time.Time, err error) {
+	claims := Claims{}
+	claims.PrivateClaims = map[string]interface{}{}
+	// append extraClaims as privateClaims
+	for k, v := range extraClaims {
+		claims.PrivateClaims[k] = v
+	}
+
+	accessExpireIn := now.Add(g.AccessExpireIn)
+	refreshExpireIn := now.Add(g.RefreshExpireIn)
+
+	if g.AccessExpireIn > 0 {
+		claims.ExpiresAt = accessExpireIn.Unix()
+	}
+	claims.NotBefore = now.Add(-1 * time.Second).Unix()
+	claims.IssuedAt = now.Unix()
+	if genRefreshToken && g.RefreshExpireIn > 0 {
+		claims.ExpiresAt = refreshExpireIn.Unix()
+		claims.Id = auth.UUID()
+		claims.PrivateClaims["token_type"] = "refresh_token"
+		// Refresh Token
+		mapClaims, err := claims.ToMapClaims()
+		if err != nil {
+			return "", "", now, err
+		}
+		refreshToken, err = g.refreshToken(mapClaims)
+		if err != nil {
+			return "", "", now, err
+		}
+	}
+
+	// Access Token
+	claims.ExpiresAt = accessExpireIn.Unix()
+	claims.Id = auth.UUID()
+	claims.PrivateClaims["token_type"] = "access_token"
+
+	mapClaims, err := claims.ToMapClaims()
+	if err != nil {
+		return "", "", now, err
+	}
+	accessToken, err = g.refreshToken(mapClaims)
+	if err != nil {
+		return "", "", now, err
+	}
+	return accessToken, refreshToken, accessExpireIn, nil
+}
+func (g *JWTGenerator) refreshToken(claims jwt.Claims) (token string, err error) {
+	jwtToken, err := g.signedString(claims)
+	if err != nil {
+		return "", err
+	}
+	return jwtToken, nil
+}
+func (g *JWTGenerator) signedString(claims jwt.Claims) (string, error) {
+	token := jwt.NewWithClaims(g.Key.GetSignedMethod(), claims)
+	key, err := g.Key.GetSignedKey(nil)
+	if err != nil {
+		return "", err
+	}
+	return token.SignedString(key)
 }

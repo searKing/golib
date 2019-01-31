@@ -12,6 +12,16 @@ import (
 	"github.com/searKing/golib/net/http_/oauth2/grant/resource"
 	"github.com/searKing/golib/net/http_/oauth2/refresh"
 	"net/http"
+	"time"
+)
+
+type AuthorizationRequest struct {
+	ClientId string `json:"client_id"`
+	Scope    string `json:"scope,omitempty"`
+}
+
+const (
+	defaultTimeFormat = time.RFC3339
 )
 
 // rfc6749 3.1
@@ -21,14 +31,14 @@ type AuthorizationCodeGrantAuthorizationResult struct {
 	Code string `json:"code"`
 }
 type ImplicitGrantAuthorizationResult struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   string `json:"expires_in,omitempty"`
-	Scope       string `json:"scope,omitempty"`
+	AccessToken string    `json:"access_token"`
+	TokenType   string    `json:"token_type"`
+	ExpiresIn   time.Time `json:"expires_in,omitempty"`
+	Scope       string    `json:"scope,omitempty"`
 }
 type AuthorizationEndpoint struct {
-	AuthorizationCodeGrantAuthenticationFunc func(ctx context.Context, authReq *grant.AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
-	ImplicitGrantAuthenticationFunc          func(ctx context.Context, authReq *grant.AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText)
+	AuthorizationCodeGrantAuthenticationFunc func(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText)
+	ImplicitGrantAuthenticationFunc          func(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText)
 
 	AuthorizationCodeGrantAccessTokenFunc                func(ctx context.Context, tokenReq *authorize.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
 	ResourceOwnerPasswordCredentialsGrantAccessTokenFunc func(ctx context.Context, tokenReq *resource.AccessTokenRequest) (tokenResp *accesstoken.SuccessfulIssueResponse, err accesstoken.ErrorText)
@@ -101,9 +111,13 @@ func (e *AuthorizationEndpoint) AuthorizateHandler(ctx context.Context) http.Han
 func (e *AuthorizationEndpoint) authorizationCodeGrantAuthenticationHandler(ctx context.Context, authReq *grant.AuthorizationRequest) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if authReq.ResponseType != "code" {
+			e.unknownGrantAuthenticationHandler(ctx, authReq).ServeHTTP(w, r)
 			return
 		}
-		authRes, errCode := e.authorizationCodeGrantAuthentication(ctx, authReq)
+		authRes, errCode := e.authorizationCodeGrantAuthentication(ctx, &AuthorizationRequest{
+			ClientId: authReq.ClientId,
+			Scope:    authReq.Scope,
+		})
 		if errCode == "" {
 			e.authenticationRejected(authReq, errCode.String(), errCode.Description()).ServeHTTP(w, r)
 			return
@@ -128,9 +142,13 @@ func (e *AuthorizationEndpoint) authorizationCodeGrantAuthenticationHandler(ctx 
 func (e *AuthorizationEndpoint) implictGrantAuthenticationHandler(ctx context.Context, authReq *grant.AuthorizationRequest) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if authReq.ResponseType != "token" {
+			e.unknownGrantAuthenticationHandler(ctx, authReq).ServeHTTP(w, r)
 			return
 		}
-		authRes, errCode := e.implicitGrantAuthentication(ctx, authReq)
+		authRes, errCode := e.implicitGrantAuthentication(ctx, &AuthorizationRequest{
+			ClientId: authReq.ClientId,
+			Scope:    authReq.Scope,
+		})
 		if errCode == "" {
 			e.authenticationRejected(authReq, errCode.String(), errCode.Description()).ServeHTTP(w, r)
 			return
@@ -142,7 +160,7 @@ func (e *AuthorizationEndpoint) implictGrantAuthenticationHandler(ctx context.Co
 		accessTokenResp := &implict.AccessTokenResponse{
 			AccessToken: authRes.AccessToken,
 			TokenType:   authRes.TokenType,
-			ExpiresIn:   authRes.ExpiresIn,
+			ExpiresIn:   authRes.ExpiresIn.Format(defaultTimeFormat),
 			Scope: func() string {
 				// rfc6749 4.2.2
 				if authRes.Scope == authReq.Scope {
@@ -376,14 +394,14 @@ func (e *AuthorizationEndpoint) authorizateRejected(err accesstoken.ErrorText) h
 	})
 }
 
-func (e *AuthorizationEndpoint) authorizationCodeGrantAuthentication(ctx context.Context, authReq *grant.AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText) {
+func (e *AuthorizationEndpoint) authorizationCodeGrantAuthentication(ctx context.Context, authReq *AuthorizationRequest) (res *AuthorizationCodeGrantAuthorizationResult, err authorize.ErrorText) {
 	if e.AuthorizationCodeGrantAuthenticationFunc != nil {
 		return e.AuthorizationCodeGrantAuthenticationFunc(ctx, authReq)
 	}
 	// UnImplemented
 	return nil, authorize.ErrorTextUnsupportedResponseType
 }
-func (e *AuthorizationEndpoint) implicitGrantAuthentication(ctx context.Context, authReq *grant.AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText) {
+func (e *AuthorizationEndpoint) implicitGrantAuthentication(ctx context.Context, authReq *AuthorizationRequest) (res *ImplicitGrantAuthorizationResult, err implict.ErrorText) {
 	if e.ImplicitGrantAuthenticationFunc != nil {
 		return e.ImplicitGrantAuthenticationFunc(ctx, authReq)
 	}
