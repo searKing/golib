@@ -3,8 +3,8 @@ package access
 import "fmt"
 
 type BadStringError struct {
-	what string
-	str  string
+	What string
+	Str  string
 }
 
-func (e *BadStringError) Error() string { return fmt.Sprintf("%s %q", e.what, e.str) }
+func (e *BadStringError) Error() string { return fmt.Sprintf("%s %q", e.What, e.Str) }

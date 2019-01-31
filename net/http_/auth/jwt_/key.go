@@ -25,15 +25,9 @@ type AuthKey struct {
 
 	// Secret key used for signing. Required.
 	symmetricKey []byte `options:"optional"`
-
-	// password for private key
-	password string `options:"optional"`
-
-	// use password for private key or not
-	usePassword bool `options:"optional"`
 }
 
-func NewAuthKeyFromRandowm(alg string) (*AuthKey, error) {
+func NewAuthKeyFromRandom(alg string) (*AuthKey, error) {
 	if alg == "" {
 		alg = SigningMethodNone
 	}

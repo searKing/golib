@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-// https://tools.ietf.org/html/rfc7235#section-4.1
+// rfc7235 4.1
 // Newauth realm="apps", type=1, title="Login to \"apps\"", Basic realm="simple"
 type Authenticate struct {
 	Newauth string

@@ -15,6 +15,11 @@ import (
 	"time"
 )
 
+const (
+	defaultAccessTokenExpireIn  = time.Hour
+	defaultRefreshTokenExpireIn = 7 * 24 * time.Hour
+)
+
 type JWTAuthorizeAccessTokenResponse struct {
 	CustomClaims jwt.MapClaims `json:"custom_claims"`
 	// Duration that a jwt access-token is valid. Optional, defaults to one hour.
@@ -89,6 +94,21 @@ type JWTAuthorizationEndpoint struct {
 	auth        *AuthorizationEndpoint
 }
 
+var DefaultJWTAuthorizationEndpoint = JWTAuthorizationEndpoint{
+	Key: func() *jwt_.AuthKey {
+		key, _ := jwt_.NewAuthKeyFromRandom(jwt_.SigningMethodHS256)
+		return key
+	}(),
+	AccessExpireIn:  defaultAccessTokenExpireIn,
+	RefreshExpireIn: defaultRefreshTokenExpireIn,
+}
+
+func NewJWTAuthorizationEndpoint(key *jwt_.AuthKey) *JWTAuthorizationEndpoint {
+	return &JWTAuthorizationEndpoint{
+		Key: key,
+	}
+}
+
 func (e *JWTAuthorizationEndpoint) lazyInit() {
 	if e.auth != nil {
 		return
@@ -144,6 +164,12 @@ func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Contex
 	if errText != "" {
 		return nil, errText
 	}
+	if jwtAuthResp == nil {
+		jwtAuthResp = &JWTImplicitGrantAuthorizationResult{
+			AccessExpireIn:  defaultAccessTokenExpireIn,
+			RefreshExpireIn: defaultRefreshTokenExpireIn,
+		}
+	}
 	gen := &JWTGenerator{
 		Key:             e.Key,
 		AccessExpireIn:  jwtAuthResp.AccessExpireIn,
@@ -179,6 +205,12 @@ func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context
 	if errText != "" {
 		return nil, errText
 	}
+	if jwtAuthResp == nil {
+		jwtAuthResp = &JWTAuthorizeAccessTokenResponse{
+			AccessExpireIn:  defaultAccessTokenExpireIn,
+			RefreshExpireIn: defaultRefreshTokenExpireIn,
+		}
+	}
 	gen := &JWTGenerator{
 		Key:             e.Key,
 		AccessExpireIn:  jwtAuthResp.AccessExpireIn,
@@ -211,6 +243,12 @@ func (e *JWTAuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessTo
 	if errText != "" {
 		return nil, errText
 	}
+	if jwtTokenResp == nil {
+		jwtTokenResp = &JWTAccessTokenResponse{
+			AccessExpireIn:  defaultAccessTokenExpireIn,
+			RefreshExpireIn: defaultRefreshTokenExpireIn,
+		}
+	}
 	gen := &JWTGenerator{
 		Key:             e.Key,
 		AccessExpireIn:  jwtTokenResp.AccessExpireIn,
@@ -236,6 +274,12 @@ func (e *JWTAuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context
 	jwtTokenResp, errText := e.ClientCredentialsGrantAccessTokenFunc(ctx, tokenReq)
 	if errText != "" {
 		return nil, errText
+	}
+	if jwtTokenResp == nil {
+		jwtTokenResp = &JWTAccessTokenResponse{
+			AccessExpireIn:  defaultAccessTokenExpireIn,
+			RefreshExpireIn: defaultRefreshTokenExpireIn,
+		}
 	}
 	gen := &JWTGenerator{
 		Key:             e.Key,
@@ -294,6 +338,12 @@ func (e *JWTAuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Cont
 	})
 	if errText != "" {
 		return nil, errText
+	}
+	if jwtTokenResp == nil {
+		jwtTokenResp = &JWTAccessTokenResponse{
+			AccessExpireIn:  defaultAccessTokenExpireIn,
+			RefreshExpireIn: defaultRefreshTokenExpireIn,
+		}
 	}
 	gen := &JWTGenerator{
 		Key:             e.Key,

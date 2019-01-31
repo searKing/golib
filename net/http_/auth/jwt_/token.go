@@ -23,7 +23,7 @@ type AuthenticationScheme struct {
 }
 
 func NewAuthenticationSchemeFromRandom(alg string) (*AuthenticationScheme, error) {
-	authKey, err := NewAuthKeyFromRandowm(alg)
+	authKey, err := NewAuthKeyFromRandom(alg)
 	if err != nil {
 		return nil, err
 	}
