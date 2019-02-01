@@ -1,6 +1,7 @@
 package refresh
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,7 +23,11 @@ import (
 // grant_type=authorization_code&code=SplxlOBeZQQYbYS6WxSbIA
 // &redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb
 func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTokenRequest, error) {
-	defer r.Body.Close()
+	var body []byte
+	defer func() {
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}()
 
 	credentials, err := basic.ParseCredentialsFromRequest(r)
 	if err != nil {
@@ -36,7 +41,7 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTo
 	// Alternatively, the authorization server MAY support including the
 	// client credentials in the request-body using the following
 	// parameters
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
+	body, err = ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		return nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}

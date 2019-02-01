@@ -1,6 +1,7 @@
 package grant
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,7 +22,11 @@ import (
 //		 &redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb HTTP/1.1
 // Host: server.example.com
 func RetrieveAuthorizationRequest(ctx context.Context, r *http.Request) (*AuthorizationRequest, error) {
-	defer r.Body.Close()
+	var body []byte
+	defer func() {
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}()
 
 	// rfc6749 2.3.1
 	// The client constructs the request URI by adding the following
@@ -83,8 +88,12 @@ func RetrieveAuthorizationRequest(ctx context.Context, r *http.Request) (*Author
 
 	}
 }
-func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (grantType string, body []byte, err error) {
-	defer r.Body.Close()
+func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (grantType string, err error) {
+	var body []byte
+	defer func() {
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}()
 
 	// rfc6749 2.3.1
 	// The client constructs the request URI by adding the following
@@ -95,31 +104,31 @@ func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (grantType
 	// parameters
 	body, err = ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
-		return "", nil, fmt.Errorf("oauth2: cannot fetch token: %v", err)
+		return "", fmt.Errorf("oauth2: cannot fetch token: %v", err)
 	}
 	content, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	switch content {
 	case "application/x-www-form-urlencoded", "text/plain":
 		vals, err := url.ParseQuery(string(body))
 		if err != nil {
-			return "", body, err
+			return "", err
 		}
-		return vals.Get("grant_type"), body, nil
+		return vals.Get("grant_type"), nil
 	case "application/json":
 		var req struct {
 			GrantType string `json:"grant_type"`
 		}
 		if err = json.Unmarshal(body, &req); err != nil {
 
-			return "", body, err
+			return "", err
 		}
-		return req.GrantType, body, nil
+		return req.GrantType, nil
 	default:
 		vars := r.URL.Query()
 		grantTypes, ok := vars["grant_type"]
 		if !ok || len(grantTypes) == 0 {
-			return "", body, errors.New("missing grant_type")
+			return "", errors.New("missing grant_type")
 		}
-		return grantTypes[0], body, nil
+		return grantTypes[0], nil
 	}
 }

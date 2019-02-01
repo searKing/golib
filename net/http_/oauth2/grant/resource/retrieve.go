@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,7 +22,11 @@ import (
 // grant_type=authorization_code&code=SplxlOBeZQQYbYS6WxSbIA
 // &redirect_uri=https%3A%2F%2Fclient%2Eexample%2Ecom%2Fcb
 func RetrieveAccessTokenRequest(ctx context.Context, r *http.Request) (*AccessTokenRequest, error) {
-	defer r.Body.Close()
+	var body []byte
+	defer func() {
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}()
 
 	// rfc6749 2.3.1
 	// The client constructs the request URI by adding the following

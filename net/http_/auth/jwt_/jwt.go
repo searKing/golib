@@ -1,6 +1,7 @@
 package jwt_
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -204,7 +205,11 @@ type ClientPassword struct {
 
 // rfc6749 2.3.1
 func RetrieveClientPassword(ctx context.Context, r *http.Request) (*ClientPassword, error) {
-	defer r.Body.Close()
+	var body []byte
+	defer func() {
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}()
 
 	// rfc6749 2.3.1
 	//  The authorization server MUST support the HTTP Basic

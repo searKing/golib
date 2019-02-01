@@ -103,25 +103,25 @@ func (e *AuthorizationEndpoint) AuthenticationHandler(ctx context.Context) http.
 }
 func (e *AuthorizationEndpoint) AccessTokenHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		grantType, body, err := grant.RetrieveAccessTokenRequest(ctx, r)
+		grantType, err := grant.RetrieveAccessTokenRequest(ctx, r)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		if grantType == "authorization_code" {
-			e.authorizationCodeGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
+			e.authorizationCodeGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
 		if grantType == "password" {
-			e.resourceOwnerPasswordCredentialsGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
+			e.resourceOwnerPasswordCredentialsGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
 		if grantType == "client_credentials" {
-			e.clientCredentialsGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
+			e.clientCredentialsGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 			return
 		}
 		if grantType == "refresh_token" {
-			e.refreshTokenGrantAccessTokenHandler(ctx, body).ServeHTTP(w, r)
+			e.refreshTokenGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 		}
 		e.unknownGrantAccessTokenHandler(ctx).ServeHTTP(w, r)
 		return
@@ -218,7 +218,7 @@ func (e *AuthorizationEndpoint) unknownGrantAuthenticationHandler(ctx context.Co
 		authorize.ErrorTextInvalidRequest.String(),
 		authorize.ErrorTextInvalidRequest.Description())
 }
-func (e *AuthorizationEndpoint) authorizationCodeGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+func (e *AuthorizationEndpoint) authorizationCodeGrantAccessTokenHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		accessTokenReq, err := authorize.RetrieveAccessTokenRequest(ctx, r)
 		if err != nil {
@@ -271,7 +271,7 @@ func (e *AuthorizationEndpoint) authorizationCodeGrantAccessTokenHandler(ctx con
 		return
 	})
 }
-func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessTokenHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		accessTokenReq, err := resource.RetrieveAccessTokenRequest(ctx, r)
 		if err != nil {
@@ -340,7 +340,7 @@ func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken
 		return
 	})
 }
-func (e *AuthorizationEndpoint) clientCredentialsGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+func (e *AuthorizationEndpoint) clientCredentialsGrantAccessTokenHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		accessTokenReq, err := client.RetrieveAccessTokenRequest(ctx, r)
 		if err != nil {
@@ -383,7 +383,7 @@ func (e *AuthorizationEndpoint) clientCredentialsGrantAccessTokenHandler(ctx con
 		return
 	})
 }
-func (e *AuthorizationEndpoint) refreshTokenGrantAccessTokenHandler(ctx context.Context, body []byte) http.Handler {
+func (e *AuthorizationEndpoint) refreshTokenGrantAccessTokenHandler(ctx context.Context) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		accessTokenReq, err := refresh.RetrieveAccessTokenRequest(ctx, r)
 		if err != nil {
@@ -512,7 +512,7 @@ func (e *AuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context.Co
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
 func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken(ctx context.Context, tokenReq *ResourceAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
-	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
+	if e.ResourceOwnerPasswordCredentialsGrantAccessTokenFunc != nil {
 		return e.ResourceOwnerPasswordCredentialsGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented
@@ -526,7 +526,7 @@ func (e *AuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context.Co
 	return nil, accesstoken.ErrorTextUnsupportedGrantType
 }
 func (e *AuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Context, tokenReq *RefreshAccessTokenRequest) (tokenResp *AccessTokenResponse, err accesstoken.ErrorText) {
-	if e.AuthorizationCodeGrantAccessTokenFunc != nil {
+	if e.RefreshTokenGrantAccessTokenFunc != nil {
 		return e.RefreshTokenGrantAccessTokenFunc(ctx, tokenReq)
 	}
 	// UnImplemented

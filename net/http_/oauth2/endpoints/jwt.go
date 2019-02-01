@@ -12,6 +12,7 @@ import (
 	"github.com/searKing/golib/net/http_/oauth2/grant/authorize"
 	"github.com/searKing/golib/net/http_/oauth2/grant/implict"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -92,6 +93,7 @@ type JWTAuthorizationEndpoint struct {
 	// This is useful for testing or if your server uses a different time zone than your tokens.
 	TimeNowFunc func(ctx context.Context) time.Time
 	auth        *AuthorizationEndpoint
+	once        sync.Once
 }
 
 var DefaultJWTAuthorizationEndpoint = JWTAuthorizationEndpoint{
@@ -110,18 +112,17 @@ func NewJWTAuthorizationEndpoint(key *jwt_.AuthKey) *JWTAuthorizationEndpoint {
 }
 
 func (e *JWTAuthorizationEndpoint) lazyInit() {
-	if e.auth != nil {
-		return
-	}
-	e.auth = &AuthorizationEndpoint{
-		AuthorizationCodeGrantAuthenticationFunc:             e.authorizationCodeGrantAuthorization,
-		ImplicitGrantAuthenticationFunc:                      e.implicitGrantAuthorization,
-		AuthorizationCodeGrantAccessTokenFunc:                e.authorizationCodeGrantAccessToken,
-		ResourceOwnerPasswordCredentialsGrantAccessTokenFunc: e.resourceOwnerPasswordCredentialsGrantAccessToken,
-		ClientCredentialsGrantAccessTokenFunc:                e.clientCredentialsGrantAccessToken,
-		RefreshTokenGrantAccessTokenFunc:                     e.refreshTokenGrantAccessToken,
-		AuthorizateFunc:                                      e.authorizate,
-	}
+	e.once.Do(func() {
+		e.auth = &AuthorizationEndpoint{
+			AuthorizationCodeGrantAuthenticationFunc:             e.authorizationCodeGrantAuthorization,
+			ImplicitGrantAuthenticationFunc:                      e.implicitGrantAuthorization,
+			AuthorizationCodeGrantAccessTokenFunc:                e.authorizationCodeGrantAccessToken,
+			ResourceOwnerPasswordCredentialsGrantAccessTokenFunc: e.resourceOwnerPasswordCredentialsGrantAccessToken,
+			ClientCredentialsGrantAccessTokenFunc:                e.clientCredentialsGrantAccessToken,
+			RefreshTokenGrantAccessTokenFunc:                     e.refreshTokenGrantAccessToken,
+			AuthorizateFunc:                                      e.authorizate,
+		}
+	})
 }
 
 func (e *JWTAuthorizationEndpoint) AuthorizationHandler(ctx context.Context) http.Handler {
@@ -195,7 +196,6 @@ func (e *JWTAuthorizationEndpoint) implicitGrantAuthorization(ctx context.Contex
 	}, ""
 }
 func (e *JWTAuthorizationEndpoint) authorizationCodeGrantAccessToken(ctx context.Context, tokenReq *AuthorizeAccessTokenRequest) (tokenResp *AuthorizeAccessTokenResponse, errText accesstoken.ErrorText) {
-	// UnImplemented
 	if e.AuthorizationCodeGrantAccessTokenFunc == nil {
 		// UnImplemented
 		return nil, accesstoken.ErrorTextUnsupportedGrantType
@@ -267,7 +267,7 @@ func (e *JWTAuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessTo
 	}, ""
 }
 func (e *JWTAuthorizationEndpoint) clientCredentialsGrantAccessToken(ctx context.Context, tokenReq *ClientAccessTokenRequest) (tokenResp *AccessTokenResponse, errText accesstoken.ErrorText) {
-	if e.ClientCredentialsGrantAccessTokenFunc != nil {
+	if e.ClientCredentialsGrantAccessTokenFunc == nil {
 		// UnImplemented
 		return nil, accesstoken.ErrorTextUnsupportedGrantType
 	}

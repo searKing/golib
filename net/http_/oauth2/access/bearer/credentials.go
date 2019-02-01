@@ -1,6 +1,7 @@
 package bearer
 
 import (
+	"bytes"
 	"github.com/searKing/golib/net/http_/oauth2/access"
 	"io"
 	"io/ioutil"
@@ -26,7 +27,12 @@ func parseCredentialsFromHeaderField(r *http.Request) string {
 }
 
 func parseCredentialsFromFormEncodedBodyParameter(r *http.Request) string {
-	defer r.Body.Close()
+	var body []byte
+	defer func() {
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}()
+
 	// rfc6750 2.2
 	// Authorization Request Header Field
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 1<<20))
