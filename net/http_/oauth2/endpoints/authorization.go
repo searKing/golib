@@ -287,7 +287,7 @@ func (e *AuthorizationEndpoint) authorizationCodeGrantAccessTokenHandler(ctx con
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 		w.Write(accessTokenRespBytes)
 		return
 	})
@@ -346,7 +346,7 @@ func (e *AuthorizationEndpoint) resourceOwnerPasswordCredentialsGrantAccessToken
 		// with a value of "no-cache".
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 		w.Write(accessTokenRespBytes)
 		return
 	})
@@ -397,7 +397,7 @@ func (e *AuthorizationEndpoint) clientCredentialsGrantAccessTokenHandler(ctx con
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 		w.Write(accessTokenRespBytes)
 		return
 	})
@@ -445,7 +445,7 @@ func (e *AuthorizationEndpoint) refreshTokenGrantAccessTokenHandler(ctx context.
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 		w.Write(accessTokenRespBytes)
 		return
 	})
