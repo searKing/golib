@@ -323,7 +323,7 @@ func (e *JWTAuthorizationEndpoint) refreshTokenGrantAccessToken(ctx context.Cont
 		return nil, accesstoken.ErrorTextUnauthorizedClient
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if ok {
+	if !ok {
 		return nil, accesstoken.ErrorTextUnauthorizedClient
 	}
 	if token_type, ok := claims["token_type"]; !ok || token_type != "refresh_token" {
@@ -380,7 +380,7 @@ func (e *JWTAuthorizationEndpoint) authorizate(ctx context.Context, accessTokenT
 		return accesstoken.ErrorTextUnauthorizedClient
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if ok {
+	if !ok {
 		return accesstoken.ErrorTextUnauthorizedClient
 	}
 	if token_type, ok := claims["token_type"]; !ok || token_type != "access_token" {
