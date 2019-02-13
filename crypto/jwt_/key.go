@@ -15,16 +15,16 @@ import (
 )
 
 type AuthKey struct {
-	alg string `options:"optional" default:"none"`
+	alg string
 
 	// Private key
-	privKey crypto.PrivateKey `options:"optional"`
+	privKey crypto.PrivateKey
 
 	// Public key
-	pubKey crypto.PublicKey `options:"optional"`
+	pubKey crypto.PublicKey
 
 	// Secret key used for signing. Required.
-	symmetricKey []byte `options:"optional"`
+	symmetricKey []byte
 }
 
 func NewAuthKeyFromRandom(alg string) (*AuthKey, error) {
