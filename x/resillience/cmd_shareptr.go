@@ -52,9 +52,9 @@ func (g *CommandSharedPtr) GetWithRetry() (*Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	ffmpeg, ok := x.Value().(*Command)
+	cmd, ok := x.Value().(*Command)
 	if ok {
-		return ffmpeg, nil
+		return cmd, nil
 	}
 	return nil, fmt.Errorf("unexpected type %T", x)
 }
@@ -104,7 +104,7 @@ func (g *CommandSharedPtr) withWatch() {
 }
 
 func (g *CommandSharedPtr) Handle() error {
-	cmd, err := g.GetUntilReady()
+	cmd, err := g.GetWithRetry()
 	if err != nil {
 		return err
 	}

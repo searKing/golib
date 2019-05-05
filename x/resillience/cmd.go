@@ -1,6 +1,7 @@
 package resilience
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"syscall"
@@ -23,8 +24,11 @@ func (r *Command) Ready() error {
 	if r == nil || r.Cmd == nil {
 		return fmt.Errorf("command: empty value")
 	}
+	if r.Cmd.ProcessState == nil {
+		return errors.New("command: not started")
+	}
 
-	if r.Cmd.ProcessState != nil && r.Cmd.ProcessState.Exited() {
+	if r.Cmd.ProcessState.Exited() {
 		return fmt.Errorf("command: exited already %s", r.Cmd.ProcessState.String())
 	}
 	return nil
@@ -52,8 +56,5 @@ func (r *Command) Handle() error {
 	if r == nil || r.Cmd == nil {
 		return fmt.Errorf("command: empty value")
 	}
-	defer func() {
-		r.Cmd = nil
-	}()
 	return r.Start()
 }
