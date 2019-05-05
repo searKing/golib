@@ -241,9 +241,9 @@ func (g *SharedPtr) WithContext(ctx context.Context) {
 type Event int
 
 const (
-	EventNew Event = iota
-	EventClose
-	EventExpired
+	EventNew     Event = iota // new and start
+	EventClose                // close
+	EventExpired              // restart
 )
 
 func (g *SharedPtr) GetTaskC() chan *Task {
