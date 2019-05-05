@@ -189,7 +189,7 @@ type SharedPtr struct {
 	// and mutating the contexts held by callers of the same request.
 	ctx context.Context
 
-	L logrus.FieldLogger
+	logger logrus.FieldLogger
 
 	x      Ptr
 	taskC  chan *Task
@@ -202,7 +202,7 @@ type SharedPtr struct {
 func NewSharedPtr(new func() (Ptr, error), l logrus.FieldLogger) *SharedPtr {
 	return &SharedPtr{
 		New:             new,
-		L:               l,
+		logger:          l,
 		TaskMaxDuration: DefaultResilienceTaskMaxDuration,
 		Timeout:         DefaultResilienceTimeout,
 	}
@@ -212,6 +212,14 @@ func NewSharedPtrFunc(
 	ready func(x interface{}) error,
 	close func(x interface{}), l logrus.FieldLogger) *SharedPtr {
 	return NewSharedPtr(WithFuncNewer(new, ready, close), l)
+}
+
+func (g *SharedPtr) GetLogger() logrus.FieldLogger {
+	if g.logger == nil {
+		g.logger = logrus.New()
+	}
+
+	return g.logger
 }
 
 //
@@ -395,13 +403,13 @@ func (g *SharedPtr) Watch() chan<- Event {
 					// New x
 					_, err := g.GetWithRetry()
 					if err != nil {
-						g.L.WithError(err).Warn("Retry failed...")
+						g.GetLogger().WithError(err).Warn("Retry failed...")
 						continue
 					}
 					if event == EventExpired {
 						g.recoveryTask(false)
 					}
-					g.L.Infof("Retry success...")
+					g.GetLogger().Infof("Retry success...")
 				case EventClose:
 					g.Reset()
 				}
@@ -424,7 +432,7 @@ func (g *SharedPtr) Ready() error {
 
 // std::shared_ptr.get() until ptr is ready & std::shared_ptr.make_unique() if necessary
 func (g *SharedPtr) GetUntilReady() (Ptr, error) {
-	err := Retry(g.Context(), g.L, g.TaskMaxDuration, g.Timeout, func() error {
+	err := Retry(g.Context(), g.GetLogger(), g.TaskMaxDuration, g.Timeout, func() error {
 		x := g.Get()
 		if x != nil {
 			// check  if x is ready
@@ -456,7 +464,7 @@ func (g *SharedPtr) GetWithRetry() (Ptr, error) {
 	}
 
 	// New x
-	err := Retry(g.Context(), g.L, g.TaskMaxDuration, g.Timeout, func() error {
+	err := Retry(g.Context(), g.GetLogger(), g.TaskMaxDuration, g.Timeout, func() error {
 		_, err := g.allocate()
 		return err
 	})
