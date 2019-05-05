@@ -9,33 +9,22 @@ import (
 
 type CommandSharedPtr struct {
 	*SharedPtr
-	logger logrus.FieldLogger
 }
 
 func NewCommandSharedPtr(ctx context.Context, cmd *exec.Cmd, l logrus.FieldLogger) *CommandSharedPtr {
 	resilienceSharedPtr := &CommandSharedPtr{
-		SharedPtr: NewSharedPtr(func() (Ptr, error) {
+		SharedPtr: NewSharedPtr(ctx, func() (Ptr, error) {
 			if cmd == nil {
 				return nil, fmt.Errorf("resillence cmd: empty value")
 			}
 			return NewCommand(cmd), nil
 		}, l),
-		logger: l,
 	}
-
-	resilienceSharedPtr.WithContext(ctx)
 	resilienceSharedPtr.withWatch()
 	resilienceSharedPtr.WithBackgroundTask()
 	return resilienceSharedPtr
 }
 
-func (g *CommandSharedPtr) GetLogger() logrus.FieldLogger {
-	if g.logger == nil {
-		g.logger = logrus.New()
-	}
-
-	return g.logger
-}
 func (g *CommandSharedPtr) GetUntilReady() (*Command, error) {
 	x, err := g.SharedPtr.GetUntilReady()
 	if err != nil {
@@ -80,6 +69,7 @@ func (g *CommandSharedPtr) withWatch() {
 			g.GetLogger().
 				WithField("module", "cmd").
 				Infof("cmd has been shutdown")
+			eventC <- EventClose
 			return
 		case <-done:
 			g.GetLogger().
@@ -89,22 +79,20 @@ func (g *CommandSharedPtr) withWatch() {
 		}
 	}()
 	go func() {
+		defer close(done)
 		cmd, err := g.GetUntilReady()
 		if err != nil {
-			close(done)
 			return
 		}
 		if err := cmd.Wait(); err != nil {
-			close(done)
 			return
 		}
-		close(done)
 		return
 	}()
 }
 
 func (g *CommandSharedPtr) Handle() error {
-	cmd, err := g.GetWithRetry()
+	cmd, err := g.Get()
 	if err != nil {
 		return err
 	}

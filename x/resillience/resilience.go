@@ -18,161 +18,15 @@ const (
 )
 
 var (
-	ErrEmptyValue = fmt.Errorf("empty value")
-	ErrNotReady   = fmt.Errorf("not ready")
+	ErrEmptyValue      = fmt.Errorf("empty value")
+	ErrAlreadyShutdown = fmt.Errorf("already shutdown")
+	ErrNotReady        = fmt.Errorf("not ready")
 )
 
 type Ptr interface {
 	Value() interface{} //actual instance
 	Ready() error
 	Close()
-}
-type emptyResilience int
-
-func (r *emptyResilience) Value() interface{} {
-	return nil
-}
-
-func (r *emptyResilience) Ready() error {
-	return nil
-}
-
-func (r *emptyResilience) Close() {
-	return
-}
-
-var (
-	background = new(emptyResilience)
-	todo       = new(emptyResilience)
-)
-
-// Background returns a non-nil, empty Context. It is never canceled, has no
-// values, and has no deadline. It is typically used by the main function,
-// initialization, and tests, and as the top-level Context for incoming
-// requests.
-func Background() Ptr {
-	return background
-}
-
-// TODO returns a non-nil, empty Context. Code should use context.TODO when
-// it's unclear which Context to use or it is not yet available (because the
-// surrounding function has not yet been extended to accept a Context
-// parameter).
-func TODO() Ptr {
-	return todo
-}
-
-type funcResilience struct {
-	x     interface{}
-	ready func(x interface{}) error
-	close func(x interface{})
-}
-
-func (r *funcResilience) Value() interface{} {
-	if r == nil {
-		return nil
-	}
-	return r.x
-}
-
-func (r *funcResilience) Ready() error {
-	if r == nil {
-		return nil
-	}
-	if r.ready == nil {
-		return nil
-	}
-	return r.ready(r.x)
-}
-
-func (r *funcResilience) Close() {
-	if r == nil {
-		return
-	}
-	if r.close == nil {
-		return
-	}
-	r.close(r.x)
-}
-
-func WithFunc(x interface{}, ready func(x interface{}) error,
-	close func(x interface{})) (Ptr, error) {
-	return &funcResilience{
-		x:     x,
-		ready: ready,
-		close: close,
-	}, nil
-}
-
-func WithFuncNewer(new func() (interface{}, error),
-	ready func(x interface{}) error,
-	close func(x interface{})) func() (Ptr, error) {
-	return func() (Ptr, error) {
-		if new == nil {
-			return nil, ErrEmptyValue
-		}
-		x, err := new()
-		if err != nil {
-			return nil, err
-		}
-		return &funcResilience{
-			x:     x,
-			ready: ready,
-			close: close,
-		}, nil
-	}
-}
-
-type TaskType int
-
-const (
-	TaskTypeDisposable      TaskType = iota // Task will be executed once and dropped whether it's successful or not
-	TaskTypeDisposableRetry                 // Task will be executed and dropped until it's successful
-	TaskTypeRepeat                          // Task will be executed again and again
-	TaskTypeConstruct                       // Task will be executed once after New is called
-	TaskTypeButt
-)
-
-type TaskState int
-
-const (
-	TaskStateNew               TaskState = iota // Task state for a task which has not yet started.
-	TaskStateRunning                            // Task state for a running task. A task in the running state is executing in the Go routine but it may be waiting for other resources from the operating system such as processor.
-	TaskStateDoneErrorHappened                  // Task state for a terminated state. The task has completed execution with some errors happened
-	TaskStateDoneNormally                       // Task state for a terminated state. The task has completed execution normally
-	TaskStateDormancy                           // Task state for a terminated state. The task has completed execution normally and will be started if New's called
-	TaskStateDeath                              // Task state for a terminated state. The task has completed execution normally and will be started if New's called
-	TaskStateButt
-)
-
-type Task struct {
-	Type   TaskType
-	State  TaskState
-	Handle func() error
-
-	ctx context.Context
-}
-
-//
-// The returned context is always non-nil; it defaults to the
-// background context.
-func (g *Task) Context() context.Context {
-	if g.ctx != nil {
-		return g.ctx
-	}
-	return context.Background()
-}
-
-// WithContext returns a shallow copy of r with its context changed
-// to ctx. The provided ctx must be non-nil.
-func (g *Task) WithContext(ctx context.Context) *Task {
-	if ctx == nil {
-		panic("nil context")
-	}
-	r2 := new(Task)
-	*r2 = *g
-	r2.ctx = ctx
-	return r2
 }
 
 type SharedPtr struct {
@@ -199,19 +53,21 @@ type SharedPtr struct {
 	mu sync.Mutex
 }
 
-func NewSharedPtr(new func() (Ptr, error), l logrus.FieldLogger) *SharedPtr {
+func NewSharedPtr(ctx context.Context, new func() (Ptr, error), l logrus.FieldLogger) *SharedPtr {
 	return &SharedPtr{
 		New:             new,
 		logger:          l,
 		TaskMaxDuration: DefaultResilienceTaskMaxDuration,
 		Timeout:         DefaultResilienceTimeout,
+		ctx:             ctx,
 	}
 }
-func NewSharedPtrFunc(
+
+func NewSharedPtrFunc(ctx context.Context,
 	new func() (interface{}, error),
 	ready func(x interface{}) error,
 	close func(x interface{}), l logrus.FieldLogger) *SharedPtr {
-	return NewSharedPtr(WithFuncNewer(new, ready, close), l)
+	return NewSharedPtr(ctx, WithFuncNewer(new, ready, close), l)
 }
 
 func (g *SharedPtr) GetLogger() logrus.FieldLogger {
@@ -234,18 +90,6 @@ func (g *SharedPtr) Context() context.Context {
 	return context.Background()
 }
 
-// WithContext returns a shallow copy of r with its context changed
-// to ctx. The provided ctx must be non-nil.
-func (g *SharedPtr) WithContext(ctx context.Context) {
-	if ctx == nil {
-		panic("nil context")
-	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.ctx = ctx
-	return
-}
-
 type Event int
 
 const (
@@ -254,7 +98,16 @@ const (
 	EventExpired              // restart
 )
 
-func (g *SharedPtr) GetTaskC() chan *Task {
+func (g *SharedPtr) InShutdown() bool {
+	select {
+	case <-g.Context().Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func (g *SharedPtr) getTaskC() chan *Task {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.taskC == nil {
@@ -264,19 +117,26 @@ func (g *SharedPtr) GetTaskC() chan *Task {
 }
 
 func (g *SharedPtr) AddTask(task *Task) {
-	if task == nil {
+	if task == nil || task.Handle == nil {
 		return
 	}
-	g.GetTaskC() <- task
+	if g.InShutdown() {
+		return
+	}
+	task.ctx = g.Context()
+	g.getTaskC() <- task
 }
-func (g *SharedPtr) AddTaskFuncAsConstruct(ctx context.Context, handle func() error) {
-	if handle == nil {
+func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error) {
+	if handle == nil || g == nil {
 		return
 	}
-	g.GetTaskC() <- &Task{
+	if g.InShutdown() {
+		return
+	}
+	g.getTaskC() <- &Task{
 		Type:   TaskTypeConstruct,
 		Handle: handle,
-		ctx:    ctx,
+		ctx:    g.Context(),
 	}
 }
 
@@ -292,7 +152,7 @@ func (g *SharedPtr) WithBackgroundTask() {
 			select {
 			case <-g.Context().Done():
 				break L
-			case task, ok := <-g.GetTaskC():
+			case task, ok := <-g.getTaskC():
 				if !ok {
 					break L
 				}
@@ -351,11 +211,17 @@ func (g *SharedPtr) WithBackgroundTask() {
 
 						// complete the task's life cycle
 						func() {
+							select {
+							case <-task.Context().Done():
+								g.mu.Lock()
+								defer g.mu.Unlock()
+								delete(g.tasks, task)
+							}
 							switch task.State {
 							case TaskStateNew:
 								go func() {
 									<-time.After(g.TaskMaxDuration)
-									g.GetTaskC() <- task
+									g.getTaskC() <- task
 								}()
 							case TaskStateDormancy:
 							case TaskStateDeath:
@@ -422,6 +288,10 @@ func (g *SharedPtr) Watch() chan<- Event {
 func (g *SharedPtr) Ready() error {
 	if g == nil {
 		return ErrEmptyValue
+	}
+
+	if g.InShutdown() {
+		return ErrAlreadyShutdown
 	}
 	x := g.Get()
 	if x != nil {
@@ -551,7 +421,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 
 			if task.State == TaskStateDormancy {
 				task.State = TaskStateNew
-				g.GetTaskC() <- task
+				g.getTaskC() <- task
 			}
 		}
 	}()
