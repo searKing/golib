@@ -21,6 +21,7 @@ func (b *FieldLogger) Write(p []byte) (n int, err error) {
 	b.GetLogger().Printf("%s", string(p))
 	return len(p), nil
 }
+
 func (b *FieldLogger) GetLogger() logrus.FieldLogger {
 	if b == nil {
 		return logrus.StandardLogger()
