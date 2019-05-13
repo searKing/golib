@@ -3,6 +3,7 @@ package resilience
 import (
 	"context"
 	"fmt"
+	"github.com/searKing/golib/x/log"
 	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ type SharedPtr struct {
 	// a value when Get would otherwise return nil.
 	// It may not be changed concurrently with calls to Get.
 	New func() (Ptr, error)
+	*log.FieldLogger
 
 	TaskMaxDuration time.Duration
 	Timeout         time.Duration
@@ -42,8 +44,6 @@ type SharedPtr struct {
 	// It is unexported to prevent people from using Context wrong
 	// and mutating the contexts held by callers of the same request.
 	ctx context.Context
-
-	logger logrus.FieldLogger
 
 	x      Ptr
 	taskC  chan *Task
@@ -56,7 +56,7 @@ type SharedPtr struct {
 func NewSharedPtr(ctx context.Context, new func() (Ptr, error), l logrus.FieldLogger) *SharedPtr {
 	return &SharedPtr{
 		New:             new,
-		logger:          l,
+		FieldLogger:     log.New(l),
 		TaskMaxDuration: DefaultResilienceTaskMaxDuration,
 		Timeout:         DefaultResilienceTimeout,
 		ctx:             ctx,
@@ -68,14 +68,6 @@ func NewSharedPtrFunc(ctx context.Context,
 	ready func(x interface{}) error,
 	close func(x interface{}), l logrus.FieldLogger) *SharedPtr {
 	return NewSharedPtr(ctx, WithFuncNewer(new, ready, close), l)
-}
-
-func (g *SharedPtr) GetLogger() logrus.FieldLogger {
-	if g.logger == nil {
-		g.logger = logrus.New()
-	}
-
-	return g.logger
 }
 
 //

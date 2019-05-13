@@ -35,7 +35,7 @@ import (
 // maxWait max interval of two f
 func Retry(ctx context.Context, logger logrus.FieldLogger, maxWait time.Duration, failAfter time.Duration, f func() error) (err error) {
 	if logger == nil {
-		logger = logrus.New()
+		logger = logrus.StandardLogger()
 	}
 
 	err = errors.New("did not connect")
