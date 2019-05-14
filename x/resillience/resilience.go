@@ -123,7 +123,10 @@ func (g *SharedPtr) AddTask(task *Task) {
 		return
 	}
 	task.ctx = g.Context()
-	g.getTaskC() <- task
+
+	go func() {
+		g.getTaskC() <- task
+	}()
 }
 func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...string) {
 	if handle == nil || g == nil {
@@ -133,13 +136,15 @@ func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...
 		return
 	}
 
-	g.getTaskC() <- &Task{
-		Description:   strings.Join(descriptions, ""),
-		Type:          TaskTypeConstruct,
-		Handle:        handle,
-		RetryDuration: DefaultTaskRetryTimeout,
-		ctx:           g.Context(),
-	}
+	go func() {
+		g.getTaskC() <- &Task{
+			Description:   strings.Join(descriptions, ""),
+			Type:          TaskTypeConstruct,
+			Handle:        handle,
+			RetryDuration: DefaultTaskRetryTimeout,
+			ctx:           g.Context(),
+		}
+	}()
 }
 
 func (g *SharedPtr) WithBackgroundTask() {
