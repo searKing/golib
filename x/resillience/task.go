@@ -1,6 +1,10 @@
 package resilience
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"time"
+)
 
 type TaskType int
 
@@ -12,6 +16,17 @@ const (
 	TaskTypeButt
 )
 
+func (t TaskType) String() string {
+	return taskType[t]
+}
+
+var taskType = map[TaskType]string{
+	TaskTypeDisposable:      "disposable",
+	TaskTypeDisposableRetry: "disposable_retry",
+	TaskTypeRepeat:          "repeat",
+	TaskTypeConstruct:       "construct",
+}
+
 type TaskState int
 
 const (
@@ -20,14 +35,31 @@ const (
 	TaskStateDoneErrorHappened                  // Task state for a terminated state. The task has completed execution with some errors happened
 	TaskStateDoneNormally                       // Task state for a terminated state. The task has completed execution normally
 	TaskStateDormancy                           // Task state for a terminated state. The task has completed execution normally and will be started if New's called
-	TaskStateDeath                              // Task state for a terminated state. The task has completed execution normally and will be started if New's called
+	TaskStateDeath                              // Task state for a terminated state. The task has completed execution normally and will never be started again
 	TaskStateButt
 )
 
+func (t TaskState) String() string {
+	return taskState[t]
+}
+
+var taskState = map[TaskState]string{
+	TaskStateNew:               "new",
+	TaskStateRunning:           "running",
+	TaskStateDoneErrorHappened: "done_error_happened",
+	TaskStateDoneNormally:      "done_normally",
+	TaskStateDormancy:          "dormancy",
+	TaskStateDeath:             "death",
+}
+
 type Task struct {
-	Type   TaskType
-	State  TaskState
-	Handle func() error
+	Type        TaskType
+	State       TaskState
+	Description string // for debug
+	Handle      func() error
+
+	RepeatDuration time.Duration
+	RetryDuration  time.Duration
 
 	ctx        context.Context
 	inShutdown bool
@@ -41,4 +73,11 @@ func (g *Task) Context() context.Context {
 		return g.ctx
 	}
 	return context.Background()
+}
+
+func (g *Task) String() string {
+	if g == nil {
+		return "empty task"
+	}
+	return fmt.Sprintf("%s-%s-%s", g.Type, g.State, g.Description)
 }

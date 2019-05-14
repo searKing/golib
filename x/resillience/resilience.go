@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/searKing/golib/x/log"
 	"github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 	"time"
 )
@@ -12,10 +13,13 @@ import (
 const (
 	// DefaultConnectTimeout is the default timeout to establish a connection to
 	// a ZooKeeper node.
-	DefaultResilienceTimeout = 0
+	DefaultResilienceConstructTimeout = 0
 	// DefaultSessionTimeout is the default timeout to keep the current
 	// ZooKeeper session alive during a temporary disconnect.
-	DefaultResilienceTaskMaxDuration = 15 * time.Second
+	DefaultResilienceTaskMaxRetryDuration = 15 * time.Second
+
+	DefaultTaskRetryTimeout      = 500 * time.Millisecond
+	DefaultTaskRescheduleTimeout = 0
 )
 
 var (
@@ -37,8 +41,11 @@ type SharedPtr struct {
 	New func() (Ptr, error)
 	*log.FieldLogger
 
-	TaskMaxDuration time.Duration
-	Timeout         time.Duration
+	// to judge whether Get&Construct is timeout
+	ConstructTimeout time.Duration
+	// MaxDuration for retry if tasks failed
+	TaskMaxRetryDuration time.Duration
+
 	// ctx is either the client or server context. It should only
 	// be modified via copying the whole Request using WithContext.
 	// It is unexported to prevent people from using Context wrong
@@ -55,11 +62,11 @@ type SharedPtr struct {
 
 func NewSharedPtr(ctx context.Context, new func() (Ptr, error), l logrus.FieldLogger) *SharedPtr {
 	return &SharedPtr{
-		New:             new,
-		FieldLogger:     log.New(l),
-		TaskMaxDuration: DefaultResilienceTaskMaxDuration,
-		Timeout:         DefaultResilienceTimeout,
-		ctx:             ctx,
+		New:                  new,
+		FieldLogger:          log.New(l),
+		TaskMaxRetryDuration: DefaultResilienceTaskMaxRetryDuration,
+		ConstructTimeout:     DefaultResilienceConstructTimeout,
+		ctx:                  ctx,
 	}
 }
 
@@ -118,17 +125,20 @@ func (g *SharedPtr) AddTask(task *Task) {
 	task.ctx = g.Context()
 	g.getTaskC() <- task
 }
-func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error) {
+func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...string) {
 	if handle == nil || g == nil {
 		return
 	}
 	if g.InShutdown() {
 		return
 	}
+
 	g.getTaskC() <- &Task{
-		Type:   TaskTypeConstruct,
-		Handle: handle,
-		ctx:    g.Context(),
+		Description:   strings.Join(descriptions, ""),
+		Type:          TaskTypeConstruct,
+		Handle:        handle,
+		RetryDuration: DefaultTaskRetryTimeout,
+		ctx:           g.Context(),
 	}
 }
 
@@ -151,6 +161,7 @@ func (g *SharedPtr) WithBackgroundTask() {
 				if task == nil {
 					continue
 				}
+				// store task
 				func() {
 					g.mu.Lock()
 					defer g.mu.Unlock()
@@ -159,9 +170,11 @@ func (g *SharedPtr) WithBackgroundTask() {
 					}
 					g.tasks[task] = struct{}{}
 				}()
+				// Handle task
 				go func() {
 					if task.State == TaskStateNew {
 						task.State = TaskStateRunning
+						g.GetLogger().WithField("task", task).Info("task is running now...")
 
 						// execute the task and refresh the state
 						func() {
@@ -208,20 +221,31 @@ func (g *SharedPtr) WithBackgroundTask() {
 								g.mu.Lock()
 								defer g.mu.Unlock()
 								delete(g.tasks, task)
-							}
-							switch task.State {
-							case TaskStateNew:
-								go func() {
-									<-time.After(g.TaskMaxDuration)
-									g.getTaskC() <- task
-								}()
-							case TaskStateDormancy:
-							case TaskStateDeath:
-								fallthrough
 							default:
-								g.mu.Lock()
-								defer g.mu.Unlock()
-								delete(g.tasks, task)
+								switch task.State {
+								case TaskStateNew:
+									go func() {
+										g.GetLogger().WithField("task", task).
+											Infof("Reschedule normally in %s...", task.RetryDuration)
+										<-time.After(task.RepeatDuration)
+										g.getTaskC() <- task
+									}()
+								case TaskStateDormancy:
+									go func() {
+										g.GetLogger().WithField("task", task).
+											Warnf("Reschedule to dormancy in %s...", task.RetryDuration)
+										<-time.After(task.RetryDuration)
+										g.getTaskC() <- task
+									}()
+								case TaskStateDeath:
+									fallthrough
+								default:
+									g.GetLogger().WithField("task", task).
+										Info("Go to death now...")
+									g.mu.Lock()
+									defer g.mu.Unlock()
+									delete(g.tasks, task)
+								}
 							}
 						}()
 					}
@@ -294,7 +318,7 @@ func (g *SharedPtr) Ready() error {
 
 // std::shared_ptr.get() until ptr is ready & std::shared_ptr.make_unique() if necessary
 func (g *SharedPtr) GetUntilReady() (Ptr, error) {
-	err := Retry(g.Context(), g.GetLogger(), g.TaskMaxDuration, g.Timeout, func() error {
+	err := Retry(g.Context(), g.GetLogger(), g.TaskMaxRetryDuration, g.ConstructTimeout, func() error {
 		x := g.Get()
 		if x != nil {
 			// check  if x is ready
@@ -326,7 +350,7 @@ func (g *SharedPtr) GetWithRetry() (Ptr, error) {
 	}
 
 	// New x
-	err := Retry(g.Context(), g.GetLogger(), g.TaskMaxDuration, g.Timeout, func() error {
+	err := Retry(g.Context(), g.GetLogger(), g.TaskMaxRetryDuration, g.ConstructTimeout, func() error {
 		_, err := g.allocate()
 		return err
 	})
