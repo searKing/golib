@@ -174,6 +174,11 @@ func (g *SharedPtr) WithBackgroundTask() {
 				if task == nil {
 					continue
 				}
+				if task.State == TaskStateRunning {
+					g.GetLogger().WithField("task", task).
+						Warn("task is running already, ignore duplicate schedule...")
+					continue
+				}
 				// store task
 				func() {
 					g.mu.Lock()
