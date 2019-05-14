@@ -240,6 +240,7 @@ func (g *SharedPtr) WithBackgroundTask() {
 										g.GetLogger().WithField("task", task).
 											Warnf("Reschedule to dormancy in %s...", task.RetryDuration)
 										<-time.After(task.RetryDuration)
+										task.State = TaskStateNew
 										g.getTaskC() <- task
 									}()
 								case TaskStateDeath:
