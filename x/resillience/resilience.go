@@ -131,7 +131,7 @@ func (g *SharedPtr) getTaskC() chan *Task {
 }
 
 func (g *SharedPtr) AddTask(task *Task) {
-	if task == nil || task.Handle == nil {
+	if g == nil || task == nil || task.Handle == nil {
 		return
 	}
 	if g.InShutdown() {
