@@ -11,13 +11,14 @@ type CommandSharedPtr struct {
 	*SharedPtr
 }
 
-func NewCommandSharedPtr(ctx context.Context, cmd *exec.Cmd, l logrus.FieldLogger) *CommandSharedPtr {
+func NewCommandSharedPtr(ctx context.Context, cmd func() *exec.Cmd, l logrus.FieldLogger) *CommandSharedPtr {
 	resilienceSharedPtr := &CommandSharedPtr{
 		SharedPtr: NewSharedPtr(ctx, func() (Ptr, error) {
 			if cmd == nil {
 				return nil, fmt.Errorf("resillence cmd: empty value")
 			}
-			return NewCommand(cmd), nil
+
+			return NewCommand(cmd()), nil
 		}, l),
 	}
 	resilienceSharedPtr.withWatch()
@@ -84,8 +85,14 @@ func (g *CommandSharedPtr) withWatch() {
 			return
 		}
 		if err := cmd.Wait(); err != nil {
+			g.GetLogger().
+				WithField("module", "cmd").WithError(err).
+				Errorf("cmd has been terminated")
 			return
 		}
+		g.GetLogger().
+			WithField("module", "cmd").
+			Infof("cmd has been done normally")
 		return
 	}()
 }

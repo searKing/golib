@@ -24,11 +24,11 @@ func (r *Command) Ready() error {
 	if r == nil || r.Cmd == nil {
 		return fmt.Errorf("command: empty value")
 	}
-	if r.Cmd.ProcessState == nil {
+	if r.Cmd.Process == nil {
 		return errors.New("command: not started")
 	}
 
-	if r.Cmd.ProcessState.Exited() {
+	if r.Cmd.ProcessState != nil && r.Cmd.ProcessState.Exited() {
 		return fmt.Errorf("command: exited already %s", r.Cmd.ProcessState.String())
 	}
 	return nil

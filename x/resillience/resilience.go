@@ -100,6 +100,18 @@ const (
 	EventExpired              // restart
 )
 
+func (e Event) String() string {
+	switch e {
+	case EventNew:
+		return "new"
+	case EventClose:
+		return "close"
+	case EventExpired:
+		return "expired"
+	default:
+		return "unknown event"
+	}
+}
 func (g *SharedPtr) InShutdown() bool {
 	select {
 	case <-g.Context().Done():
@@ -128,9 +140,16 @@ func (g *SharedPtr) AddTask(task *Task) {
 	task.ctx = g.Context()
 
 	go func() {
-		_, err := g.GetUntilReady()
-		if err != nil {
-			return
+		if task.Type == TaskTypeConstruct {
+			_, err := g.GetWithRetry()
+			if err != nil {
+				return
+			}
+		} else {
+			_, err := g.GetUntilReady()
+			if err != nil {
+				return
+			}
 		}
 		g.getTaskC() <- task
 	}()
@@ -144,7 +163,7 @@ func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...
 	}
 
 	go func() {
-		_, err := g.GetUntilReady()
+		_, err := g.GetWithRetry()
 		if err != nil {
 			return
 		}
@@ -190,10 +209,7 @@ func (g *SharedPtr) Watch() chan<- Event {
 						g.GetLogger().WithError(err).Warn("Retry failed...")
 						continue
 					}
-					if event == EventExpired {
-						g.recoveryTask(false)
-					}
-					g.GetLogger().Infof("Retry success...")
+					g.GetLogger().WithField("event", event.String()).Infof("handle event success...")
 				case EventClose:
 					g.Reset()
 				}
@@ -304,8 +320,8 @@ func (g *SharedPtr) allocateLocked() (Ptr, error) {
 			return g.x, err
 		}
 		g.x = x
-		g.recoveryTask(true)
 		g.backgroundTask(true)
+		g.recoveryTask(true)
 	}
 	return g.x, nil
 
@@ -334,7 +350,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 				break L
 			default:
 			}
-			if task.Type == TaskTypeConstruct {
+			if task.Type == TaskTypeConstruct || task.Type == TaskTypeRepeat {
 				task.State = TaskStateDormancy
 			}
 
@@ -383,14 +399,37 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 					continue
 				}
 				// store task
-				func() {
+				added := func() (added bool) {
 					g.mu.Lock()
 					defer g.mu.Unlock()
 					if g.tasks == nil {
 						g.tasks = make(map[*Task]struct{})
 					}
+
+					if _, has := g.tasks[task]; has {
+						return false
+					}
 					g.tasks[task] = struct{}{}
+					return true
 				}()
+				if !added {
+					g.GetLogger().WithField("task", task).
+						Warn("task is added already, ignore duplicate schedule...")
+					continue
+				}
+				if task.Type == TaskTypeConstruct {
+					if _, err := g.GetWithRetry(); err != nil {
+						g.GetLogger().WithField("task", task).
+							Warn("task is added but not scheduled, new has not been called yet...")
+						continue
+					}
+				} else {
+					if _, err := g.GetUntilReady(); err != nil {
+						g.GetLogger().WithField("task", task).
+							Warn("task is added but not scheduled, not ready yet...")
+						continue
+					}
+				}
 				// Handle task
 				go func() {
 					if task.State == TaskStateNew {
@@ -454,14 +493,11 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 										g.getTaskC() <- task
 									}()
 								case TaskStateDormancy:
-									go func() {
-										g.GetLogger().WithField("task", task).
-											Warnf("Reschedule to dormancy in %s...", task.RetryDuration)
-										<-time.After(task.RetryDuration)
-										task.State = TaskStateNew
-										g.getTaskC() <- task
-									}()
+									g.GetLogger().WithField("task", task).
+										Infof("task is done,  go to dormancy...")
 								case TaskStateDeath:
+									g.GetLogger().WithField("task", task).
+										Infof("task is dead,  go to death...")
 									fallthrough
 								default:
 									g.GetLogger().WithField("task", task).

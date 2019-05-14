@@ -11,7 +11,7 @@ type TaskType int
 const (
 	TaskTypeDisposable      TaskType = iota // Task will be executed once and dropped whether it's successful or not
 	TaskTypeDisposableRetry                 // Task will be executed and dropped until it's successful
-	TaskTypeRepeat                          // Task will be executed again and again
+	TaskTypeRepeat                          // Task will be executed again and again, even New is called
 	TaskTypeConstruct                       // Task will be executed once after New is called
 	TaskTypeButt
 )
