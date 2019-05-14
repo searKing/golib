@@ -18,7 +18,7 @@ const (
 	// ZooKeeper session alive during a temporary disconnect.
 	DefaultResilienceTaskMaxRetryDuration = 15 * time.Second
 
-	DefaultTaskRetryTimeout      = 500 * time.Millisecond
+	DefaultTaskRetryTimeout      = 1 * time.Second
 	DefaultTaskRescheduleTimeout = 0
 )
 
@@ -189,6 +189,8 @@ func (g *SharedPtr) WithBackgroundTask() {
 							}
 							if err := task.Handle(); err != nil {
 								task.State = TaskStateDoneErrorHappened
+								g.GetLogger().WithField("task", task).WithError(err).
+									Warnf("task is failed...")
 								return
 							}
 							task.State = TaskStateDoneNormally
