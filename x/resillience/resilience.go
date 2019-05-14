@@ -125,6 +125,10 @@ func (g *SharedPtr) AddTask(task *Task) {
 	task.ctx = g.Context()
 
 	go func() {
+		_, err := g.GetUntilReady()
+		if err != nil {
+			return
+		}
 		g.getTaskC() <- task
 	}()
 }
@@ -137,6 +141,10 @@ func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...
 	}
 
 	go func() {
+		_, err := g.GetUntilReady()
+		if err != nil {
+			return
+		}
 		g.getTaskC() <- &Task{
 			Description:   strings.Join(descriptions, ""),
 			Type:          TaskTypeConstruct,
