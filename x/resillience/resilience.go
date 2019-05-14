@@ -3,6 +3,7 @@ package resilience
 import (
 	"context"
 	"fmt"
+	"github.com/searKing/golib/sync_/atomic_"
 	"github.com/searKing/golib/x/log"
 	"github.com/sirupsen/logrus"
 	"strings"
@@ -56,6 +57,8 @@ type SharedPtr struct {
 	taskC  chan *Task
 	tasks  map[*Task]struct{}
 	eventC chan Event
+
+	backgroundStopped atomic_.Bool
 
 	mu sync.Mutex
 }
@@ -152,128 +155,6 @@ func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...
 			RetryDuration: DefaultTaskRetryTimeout,
 			ctx:           g.Context(),
 		}
-	}()
-}
-
-func (g *SharedPtr) WithBackgroundTask() {
-	defer func() {
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		g.tasks = make(map[*Task]struct{})
-	}()
-	go func() {
-	L:
-		for {
-			select {
-			case <-g.Context().Done():
-				break L
-			case task, ok := <-g.getTaskC():
-				if !ok {
-					break L
-				}
-				if task == nil {
-					continue
-				}
-				if task.State == TaskStateRunning {
-					g.GetLogger().WithField("task", task).
-						Warn("task is running already, ignore duplicate schedule...")
-					continue
-				}
-				// store task
-				func() {
-					g.mu.Lock()
-					defer g.mu.Unlock()
-					if g.tasks == nil {
-						g.tasks = make(map[*Task]struct{})
-					}
-					g.tasks[task] = struct{}{}
-				}()
-				// Handle task
-				go func() {
-					if task.State == TaskStateNew {
-						task.State = TaskStateRunning
-						g.GetLogger().WithField("task", task).Info("task is running now...")
-
-						// execute the task and refresh the state
-						func() {
-							if task.Handle == nil {
-								task.State = TaskStateDoneNormally
-								return
-							}
-							if err := task.Handle(); err != nil {
-								task.State = TaskStateDoneErrorHappened
-								g.GetLogger().WithField("task", task).WithError(err).
-									Warnf("task is failed...")
-								return
-							}
-							task.State = TaskStateDoneNormally
-						}()
-
-						// handle completed execution and refresh the state
-						func() {
-							select {
-							case <-task.Context().Done():
-								task.State = TaskStateDeath
-							default:
-								switch task.Type {
-								case TaskTypeDisposable:
-									task.State = TaskStateDeath
-								case TaskTypeDisposableRetry:
-									if task.State == TaskStateDoneErrorHappened {
-										task.State = TaskStateNew
-									} else {
-										task.State = TaskStateDeath
-									}
-								case TaskTypeRepeat:
-									task.State = TaskStateNew
-								case TaskTypeConstruct:
-									task.State = TaskStateDormancy
-								default:
-									task.State = TaskStateDeath
-								}
-							}
-						}()
-
-						// complete the task's life cycle
-						func() {
-							select {
-							case <-task.Context().Done():
-								g.mu.Lock()
-								defer g.mu.Unlock()
-								delete(g.tasks, task)
-							default:
-								switch task.State {
-								case TaskStateNew:
-									go func() {
-										g.GetLogger().WithField("task", task).
-											Infof("Reschedule normally in %s...", task.RetryDuration)
-										<-time.After(task.RepeatDuration)
-										g.getTaskC() <- task
-									}()
-								case TaskStateDormancy:
-									go func() {
-										g.GetLogger().WithField("task", task).
-											Warnf("Reschedule to dormancy in %s...", task.RetryDuration)
-										<-time.After(task.RetryDuration)
-										task.State = TaskStateNew
-										g.getTaskC() <- task
-									}()
-								case TaskStateDeath:
-									fallthrough
-								default:
-									g.GetLogger().WithField("task", task).
-										Info("Go to death now...")
-									g.mu.Lock()
-									defer g.mu.Unlock()
-									delete(g.tasks, task)
-								}
-							}
-						}()
-					}
-				}()
-			}
-		}
-
 	}()
 }
 
@@ -424,6 +305,7 @@ func (g *SharedPtr) allocateLocked() (Ptr, error) {
 		}
 		g.x = x
 		g.recoveryTask(true)
+		g.backgroundTask(true)
 	}
 	return g.x, nil
 
@@ -461,5 +343,139 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 				g.getTaskC() <- task
 			}
 		}
+	}()
+}
+
+func (g *SharedPtr) backgroundTask(locked bool) {
+	swapped := g.backgroundStopped.CAS(false, true)
+	if !swapped {
+		return
+	}
+
+	defer func() {
+		if !locked {
+			g.mu.Lock()
+			defer g.mu.Unlock()
+		}
+		if g.tasks == nil {
+			g.tasks = make(map[*Task]struct{})
+		}
+	}()
+	go func() {
+		defer func() {
+			g.backgroundStopped.Store(false)
+		}()
+	L:
+		for {
+			select {
+			case <-g.Context().Done():
+				break L
+			case task, ok := <-g.getTaskC():
+				if !ok {
+					break L
+				}
+				if task == nil {
+					continue
+				}
+				if task.State == TaskStateRunning {
+					g.GetLogger().WithField("task", task).
+						Warn("task is running already, ignore duplicate schedule...")
+					continue
+				}
+				// store task
+				func() {
+					g.mu.Lock()
+					defer g.mu.Unlock()
+					if g.tasks == nil {
+						g.tasks = make(map[*Task]struct{})
+					}
+					g.tasks[task] = struct{}{}
+				}()
+				// Handle task
+				go func() {
+					if task.State == TaskStateNew {
+						task.State = TaskStateRunning
+						g.GetLogger().WithField("task", task).Info("task is running now...")
+
+						// execute the task and refresh the state
+						func() {
+							if task.Handle == nil {
+								task.State = TaskStateDoneNormally
+								return
+							}
+							if err := task.Handle(); err != nil {
+								task.State = TaskStateDoneErrorHappened
+								g.GetLogger().WithField("task", task).WithError(err).
+									Warnf("task is failed...")
+								return
+							}
+							task.State = TaskStateDoneNormally
+						}()
+
+						// handle completed execution and refresh the state
+						func() {
+							select {
+							case <-task.Context().Done():
+								task.State = TaskStateDeath
+							default:
+								switch task.Type {
+								case TaskTypeDisposable:
+									task.State = TaskStateDeath
+								case TaskTypeDisposableRetry:
+									if task.State == TaskStateDoneErrorHappened {
+										task.State = TaskStateNew
+									} else {
+										task.State = TaskStateDeath
+									}
+								case TaskTypeRepeat:
+									task.State = TaskStateNew
+								case TaskTypeConstruct:
+									task.State = TaskStateDormancy
+								default:
+									task.State = TaskStateDeath
+								}
+							}
+						}()
+
+						// complete the task's life cycle
+						func() {
+							select {
+							case <-task.Context().Done():
+								g.mu.Lock()
+								defer g.mu.Unlock()
+								delete(g.tasks, task)
+							default:
+								switch task.State {
+								case TaskStateNew:
+									go func() {
+										g.GetLogger().WithField("task", task).
+											Infof("Reschedule normally in %s...", task.RetryDuration)
+										<-time.After(task.RepeatDuration)
+										g.getTaskC() <- task
+									}()
+								case TaskStateDormancy:
+									go func() {
+										g.GetLogger().WithField("task", task).
+											Warnf("Reschedule to dormancy in %s...", task.RetryDuration)
+										<-time.After(task.RetryDuration)
+										task.State = TaskStateNew
+										g.getTaskC() <- task
+									}()
+								case TaskStateDeath:
+									fallthrough
+								default:
+									g.GetLogger().WithField("task", task).
+										Info("Go to death now...")
+									g.mu.Lock()
+									defer g.mu.Unlock()
+									delete(g.tasks, task)
+								}
+							}
+						}()
+					}
+				}()
+			}
+		}
+
 	}()
 }

@@ -21,7 +21,6 @@ func NewCommandSharedPtr(ctx context.Context, cmd *exec.Cmd, l logrus.FieldLogge
 		}, l),
 	}
 	resilienceSharedPtr.withWatch()
-	resilienceSharedPtr.WithBackgroundTask()
 	return resilienceSharedPtr
 }
 
