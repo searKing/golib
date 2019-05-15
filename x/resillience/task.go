@@ -12,7 +12,8 @@ const (
 	TaskTypeDisposable      TaskType = iota // Task will be executed once and dropped whether it's successful or not
 	TaskTypeDisposableRetry                 // Task will be executed and dropped until it's successful
 	TaskTypeRepeat                          // Task will be executed again and again, even New is called
-	TaskTypeConstruct                       // Task will be executed once after New is called
+	TaskTypeConstruct                       // Task will be executed once after New is called, don't wait for ready
+	TaskTypeConstructRepeat                 // Task will be executed again and again after New is called, don't wait for ready
 	TaskTypeButt
 )
 
@@ -25,6 +26,7 @@ var taskType = map[TaskType]string{
 	TaskTypeDisposableRetry: "disposable_retry",
 	TaskTypeRepeat:          "repeat",
 	TaskTypeConstruct:       "construct",
+	TaskTypeConstructRepeat: "construct_repeat",
 }
 
 type TaskState int

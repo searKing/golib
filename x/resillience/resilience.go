@@ -20,7 +20,7 @@ const (
 	DefaultResilienceTaskMaxRetryDuration = 15 * time.Second
 
 	DefaultTaskRetryTimeout      = 1 * time.Second
-	DefaultTaskRescheduleTimeout = 0
+	DefaultTaskRescheduleTimeout = 1 * time.Second
 )
 
 var (
@@ -140,7 +140,7 @@ func (g *SharedPtr) AddTask(task *Task) {
 	task.ctx = g.Context()
 
 	go func() {
-		if task.Type == TaskTypeConstruct {
+		if task.Type == TaskTypeConstruct || task.Type == TaskTypeConstructRepeat {
 			_, err := g.GetWithRetry()
 			if err != nil {
 				return
@@ -168,11 +168,35 @@ func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...
 			return
 		}
 		g.getTaskC() <- &Task{
-			Description:   strings.Join(descriptions, ""),
-			Type:          TaskTypeConstruct,
-			Handle:        handle,
-			RetryDuration: DefaultTaskRetryTimeout,
-			ctx:           g.Context(),
+			Description:    strings.Join(descriptions, ""),
+			Type:           TaskTypeConstruct,
+			Handle:         handle,
+			RetryDuration:  DefaultTaskRetryTimeout,
+			RepeatDuration: DefaultTaskRescheduleTimeout,
+			ctx:            g.Context(),
+		}
+	}()
+}
+func (g *SharedPtr) AddTaskFuncAsConstructRepeat(handle func() error, descriptions ...string) {
+	if handle == nil || g == nil {
+		return
+	}
+	if g.InShutdown() {
+		return
+	}
+
+	go func() {
+		_, err := g.GetWithRetry()
+		if err != nil {
+			return
+		}
+		g.getTaskC() <- &Task{
+			Description:    strings.Join(descriptions, ""),
+			Type:           TaskTypeConstructRepeat,
+			Handle:         handle,
+			RetryDuration:  DefaultTaskRetryTimeout,
+			RepeatDuration: DefaultTaskRescheduleTimeout,
+			ctx:            g.Context(),
 		}
 	}()
 }
@@ -350,7 +374,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 				break L
 			default:
 			}
-			if task.Type == TaskTypeConstruct || task.Type == TaskTypeRepeat {
+			if task.Type == TaskTypeConstruct || task.Type == TaskTypeConstructRepeat || task.Type == TaskTypeRepeat {
 				task.State = TaskStateDormancy
 			}
 
@@ -429,7 +453,7 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 						Warn("task is added already, ignore duplicate schedule...")
 					continue
 				}
-				if task.Type == TaskTypeConstruct {
+				if task.Type == TaskTypeConstruct || task.Type == TaskTypeConstructRepeat {
 					if _, err := g.GetWithRetry(); err != nil {
 						g.GetLogger().WithField("task", task).
 							Warn("task is added but not scheduled, new has not been called yet...")
@@ -494,6 +518,16 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 										task.State = TaskStateDeath
 									}
 								case TaskTypeRepeat:
+									waitBeforeRepeat()
+									task.State = TaskStateNew
+								case TaskTypeConstructRepeat:
+									g.GetLogger().WithField("task", task).
+										Warnf("task is delete and restart all tasks...")
+									deleteTask() // don't recover this task, this task will be added later
+									g.Reset()
+									go func() {
+										_, _ = g.GetWithRetry()
+									}()
 									waitBeforeRepeat()
 									task.State = TaskStateNew
 								case TaskTypeConstruct:
