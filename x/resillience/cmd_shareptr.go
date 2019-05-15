@@ -21,7 +21,6 @@ func NewCommandSharedPtr(ctx context.Context, cmd func() *exec.Cmd, l logrus.Fie
 			return NewCommand(cmd()), nil
 		}, l),
 	}
-	resilienceSharedPtr.withWatch()
 	return resilienceSharedPtr
 }
 
@@ -59,48 +58,10 @@ func (g *CommandSharedPtr) Get() (*Command, error) {
 	return nil, fmt.Errorf("unexpected type %T", x)
 }
 
-func (g *CommandSharedPtr) withWatch() {
-	done := make(chan struct{})
-	// watch cmd's state
-	eventC := g.Watch()
-	go func() {
-		select {
-		case <-g.Context().Done():
-			g.GetLogger().
-				WithField("module", "cmd").
-				Infof("cmd has been shutdown")
-			eventC <- EventClose
-			return
-		case <-done:
-			g.GetLogger().
-				WithField("module", "cmd").
-				Warnf("cmd has been expired")
-			eventC <- EventExpired
-		}
-	}()
-	go func() {
-		defer close(done)
-		cmd, err := g.GetUntilReady()
-		if err != nil {
-			return
-		}
-		if err := cmd.Wait(); err != nil {
-			g.GetLogger().
-				WithField("module", "cmd").WithError(err).
-				Errorf("cmd has been terminated")
-			return
-		}
-		g.GetLogger().
-			WithField("module", "cmd").
-			Infof("cmd has been done normally")
-		return
-	}()
-}
-
-func (g *CommandSharedPtr) Handle() error {
+func (g *CommandSharedPtr) Run() error {
 	cmd, err := g.Get()
 	if err != nil {
 		return err
 	}
-	return cmd.Handle()
+	return cmd.Run()
 }

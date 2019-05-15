@@ -469,7 +469,13 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 								case TaskTypeRepeat:
 									task.State = TaskStateNew
 								case TaskTypeConstruct:
-									task.State = TaskStateDormancy
+									if task.State == TaskStateDoneErrorHappened {
+										g.Reset()
+										_, _ = g.GetWithRetry()
+										task.State = TaskStateNew
+									} else {
+										task.State = TaskStateDormancy
+									}
 								default:
 									task.State = TaskStateDeath
 								}

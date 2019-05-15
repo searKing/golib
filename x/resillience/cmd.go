@@ -52,9 +52,9 @@ func (r *Command) Close() {
 	}
 	r.Cmd = nil
 }
-func (r *Command) Handle() error {
+func (r *Command) Run() error {
 	if r == nil || r.Cmd == nil {
 		return fmt.Errorf("command: empty value")
 	}
-	return r.Start()
+	return r.Cmd.Run()
 }
