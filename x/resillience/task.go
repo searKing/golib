@@ -3,30 +3,41 @@ package resilience
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
-type TaskType int
-
-const (
-	TaskTypeDisposable      TaskType = iota // Task will be executed once and dropped whether it's successful or not
-	TaskTypeDisposableRetry                 // Task will be executed and dropped until it's successful
-	TaskTypeRepeat                          // Task will be executed again and again, even New is called
-	TaskTypeConstruct                       // Task will be executed once after New is called, don't wait for ready
-	TaskTypeConstructRepeat                 // Task will be executed again and again after New is called, don't wait for ready
-	TaskTypeButt
-)
-
-func (t TaskType) String() string {
-	return taskType[t]
+type TaskType struct {
+	Drop      bool // task will be dropped
+	Retry     bool // task will be retried if error happens
+	Construct bool // task will be called after New
+	Repeat    bool // Task will be executed again and again
 }
 
-var taskType = map[TaskType]string{
-	TaskTypeDisposable:      "disposable",
-	TaskTypeDisposableRetry: "disposable_retry",
-	TaskTypeRepeat:          "repeat",
-	TaskTypeConstruct:       "construct",
-	TaskTypeConstructRepeat: "construct_repeat",
+func (t TaskType) String() string {
+	var b strings.Builder
+	if t.Drop {
+		b.WriteString("drop")
+	}
+	if t.Retry {
+		if b.String() != "" {
+			b.WriteRune('-')
+		}
+		b.WriteString("retry")
+	}
+	if t.Construct {
+		if b.String() != "" {
+			b.WriteRune('-')
+		}
+		b.WriteString("construct")
+	}
+	if t.Repeat {
+		if b.String() != "" {
+			b.WriteRune('-')
+		}
+		b.WriteString("repeat")
+	}
+	return b.String()
 }
 
 type TaskState int
