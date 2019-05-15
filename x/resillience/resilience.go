@@ -398,21 +398,33 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 						Warn("task is running already, ignore duplicate schedule...")
 					continue
 				}
+				// verify whether task is duplicated
 				// store task
-				added := func() (added bool) {
+				addedTask := func() (added bool) {
 					g.mu.Lock()
 					defer g.mu.Unlock()
 					if g.tasks == nil {
 						g.tasks = make(map[*Task]struct{})
 					}
+					_, has := g.tasks[task]
+					return has
+				}()
 
-					if _, has := g.tasks[task]; has {
-						return false
+				addTask := func() {
+					g.mu.Lock()
+					defer g.mu.Unlock()
+					if g.tasks == nil {
+						g.tasks = make(map[*Task]struct{})
 					}
 					g.tasks[task] = struct{}{}
-					return true
-				}()
-				if !added {
+				}
+
+				deleteTask := func() {
+					g.mu.Lock()
+					defer g.mu.Unlock()
+					delete(g.tasks, task)
+				}
+				if addedTask {
 					g.GetLogger().WithField("task", task).
 						Warn("task is added already, ignore duplicate schedule...")
 					continue
@@ -430,9 +442,11 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 						continue
 					}
 				}
+
 				// Handle task
 				go func() {
 					if task.State == TaskStateNew {
+						addTask()
 						task.State = TaskStateRunning
 						g.GetLogger().WithField("task", task).Info("task is running now...")
 
@@ -445,14 +459,26 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 							if err := task.Handle(); err != nil {
 								task.State = TaskStateDoneErrorHappened
 								g.GetLogger().WithField("task", task).WithError(err).
-									Warnf("task is failed...")
+									Warnf("task is done failed...")
 								return
 							}
+							g.GetLogger().WithField("task", task).
+								Info("task is done successfully...")
 							task.State = TaskStateDoneNormally
 						}()
 
 						// handle completed execution and refresh the state
 						func() {
+							waitBeforeRepeat := func() {
+								g.GetLogger().WithField("task", task).
+									Warnf("Reschedule to repeat in %s...", task.RepeatDuration)
+								<-time.After(task.RepeatDuration)
+							}
+							waitBeforeRecover := func() {
+								g.GetLogger().WithField("task", task).
+									Warnf("Reschedule to recover in %s...", task.RetryDuration)
+								<-time.After(task.RetryDuration)
+							}
 							select {
 							case <-task.Context().Done():
 								task.State = TaskStateDeath
@@ -462,16 +488,24 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 									task.State = TaskStateDeath
 								case TaskTypeDisposableRetry:
 									if task.State == TaskStateDoneErrorHappened {
+										waitBeforeRecover()
 										task.State = TaskStateNew
 									} else {
 										task.State = TaskStateDeath
 									}
 								case TaskTypeRepeat:
+									waitBeforeRepeat()
 									task.State = TaskStateNew
 								case TaskTypeConstruct:
 									if task.State == TaskStateDoneErrorHappened {
+										g.GetLogger().WithField("task", task).
+											Warnf("task is delete and restart all tasks...")
+										deleteTask() // don't recover this task, this task will be added later
 										g.Reset()
-										_, _ = g.GetWithRetry()
+										go func() {
+											_, _ = g.GetWithRetry()
+										}()
+										waitBeforeRecover()
 										task.State = TaskStateNew
 									} else {
 										task.State = TaskStateDormancy
@@ -481,21 +515,21 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 								}
 							}
 						}()
-
 						// complete the task's life cycle
 						func() {
 							select {
 							case <-task.Context().Done():
-								g.mu.Lock()
-								defer g.mu.Unlock()
-								delete(g.tasks, task)
+								g.GetLogger().WithField("task", task).
+									Info("Go to death now...")
+								go deleteTask()
+								return
 							default:
 								switch task.State {
 								case TaskStateNew:
 									go func() {
+										deleteTask()
 										g.GetLogger().WithField("task", task).
-											Infof("Reschedule normally in %s...", task.RetryDuration)
-										<-time.After(task.RepeatDuration)
+											Infof("Reschedule now...")
 										g.getTaskC() <- task
 									}()
 								case TaskStateDormancy:
@@ -508,9 +542,7 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 								default:
 									g.GetLogger().WithField("task", task).
 										Info("Go to death now...")
-									g.mu.Lock()
-									defer g.mu.Unlock()
-									delete(g.tasks, task)
+									go deleteTask()
 								}
 							}
 						}()

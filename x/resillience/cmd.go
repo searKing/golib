@@ -56,5 +56,7 @@ func (r *Command) Run() error {
 	if r == nil || r.Cmd == nil {
 		return fmt.Errorf("command: empty value")
 	}
-	return r.Cmd.Run()
+	err := r.Cmd.Run()
+
+	return err
 }
