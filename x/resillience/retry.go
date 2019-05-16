@@ -63,7 +63,7 @@ L:
 		if err = f(); err == nil {
 			return nil
 		}
-		logger.WithError(err).Warnf("Retrying in %s seconds...", loopWait)
+		logger.WithError(err).Warnf("retrying in %s seconds...", loopWait)
 		select {
 		case <-ctx.Done():
 			break L
