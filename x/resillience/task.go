@@ -75,6 +75,7 @@ type Task struct {
 	RetryDuration  time.Duration
 
 	ctx        context.Context
+	cancelFn   context.CancelFunc
 	inShutdown bool
 }
 
@@ -92,5 +93,12 @@ func (g *Task) String() string {
 	if g == nil {
 		return "empty task"
 	}
-	return fmt.Sprintf("%s-%s-%s", g.Type, g.State, g.Description)
+	return fmt.Sprintf("%s-%s", g.ID(), g.Description)
+}
+
+func (g *Task) ID() string {
+	if g == nil {
+		return "empty task"
+	}
+	return fmt.Sprintf("%s-%p", g.Type, g.Handle)
 }
