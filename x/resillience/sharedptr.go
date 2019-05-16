@@ -67,13 +67,6 @@ func NewSharedPtr(ctx context.Context, new func() (Ptr, error), l logrus.FieldLo
 	}
 }
 
-func NewSharedPtrFunc(ctx context.Context,
-	new func() (interface{}, error),
-	ready func(x interface{}) error,
-	close func(x interface{}), l logrus.FieldLogger) *SharedPtr {
-	return NewSharedPtr(ctx, WithFuncNewer(new, ready, close), l)
-}
-
 //
 // The returned context is always non-nil; it defaults to the
 // background context.
