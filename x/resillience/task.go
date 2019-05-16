@@ -102,3 +102,11 @@ func (t *Task) ID() string {
 	}
 	return fmt.Sprintf("%s-%p", t.Type, t.Handle)
 }
+
+func (t *Task) Clone() *Task {
+	if t == nil {
+		return nil
+	}
+	task := *t
+	return &task
+}

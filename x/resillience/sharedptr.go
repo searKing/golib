@@ -349,10 +349,11 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 		return tasks
 	}()
 	func() {
-		for _, task := range tasks {
-			if task == nil {
+		for _, t := range tasks {
+			if t == nil {
 				continue
 			}
+			task := t.Clone()
 			select {
 			case <-g.Context().Done():
 				return
