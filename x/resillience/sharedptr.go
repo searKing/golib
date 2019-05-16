@@ -119,6 +119,7 @@ func (g *SharedPtr) AddTask(task *Task) error {
 
 	go g.backgroundTask(false)
 	go func() {
+		g.GetLogger().WithField("task", task).Info("new task is adding...")
 		g.getTaskC() <- task
 	}()
 	return nil
@@ -366,7 +367,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 
 			if task.State == TaskStateDormancy {
 				task.State = TaskStateNew
-				g.GetLogger().WithField("task", task).Info("recover task is successful...")
+				g.GetLogger().WithField("task", task).Info("recover task is adding...")
 				g.getTaskC() <- task
 			}
 		}
@@ -403,9 +404,9 @@ L:
 			if task == nil {
 				continue
 			}
-			if task.State == TaskStateRunning {
+			if task.State != TaskStateNew {
 				g.GetLogger().WithField("task", task).
-					Warn("task is running already, ignore duplicate schedule...")
+					Warn("task is received with unexpected state, ignore duplicate schedule...")
 				continue
 			}
 			// verify whether task is duplicated
@@ -457,14 +458,21 @@ L:
 			}
 
 			// Handle task
+			addTask()
 			go func() {
 				if task.State == TaskStateNew {
-					addTask()
 					task.State = TaskStateRunning
 					g.GetLogger().WithField("task", task).Info("task is running now...")
 
 					// execute the task and refresh the state
 					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								task.State = TaskStateDoneErrorHappened
+								g.GetLogger().WithField("task", task).WithField("recovery", r).
+									Error("task is done failed...")
+							}
+						}()
 						if task.Handle == nil {
 							task.State = TaskStateDoneNormally
 							return
@@ -567,12 +575,14 @@ L:
 						default:
 							switch task.State {
 							case TaskStateNew:
-								go func() {
-									deleteTask(false)
+								deleteTask(false)
+								if task.State == TaskStateRunning {
 									g.GetLogger().WithField("task", task).
 										Infof("task is rescheduled now...")
-									g.getTaskC() <- task
-								}()
+								}
+								g.GetLogger().WithField("task", task).
+									Infof("task is rescheduled now...")
+								g.getTaskC() <- task
 							case TaskStateDormancy:
 								g.GetLogger().WithField("task", task).
 									Infof("task is done,  go to dormancy...")
