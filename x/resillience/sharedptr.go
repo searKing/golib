@@ -91,11 +91,13 @@ func (g *SharedPtr) InShutdown() bool {
 
 func (g *SharedPtr) AddTask(task *Task) error {
 	if g == nil || task == nil || task.Handle == nil {
-		g.GetLogger().WithField("task", task).
-			Warn("task is added already, ignore duplicate schedule...")
+		g.GetLogger().WithField("task", task).WithError(ErrEmptyValue).
+			Error("task is nonsense to add, ignore it...")
 		return ErrEmptyValue
 	}
 	if g.InShutdown() {
+		g.GetLogger().WithField("task", task).
+			Error("resilience is shutdown  already, ignore it...")
 		return ErrAlreadyShutdown
 	}
 	task.ctx, task.cancelFn = context.WithCancel(g.Context())
@@ -110,6 +112,8 @@ func (g *SharedPtr) AddTask(task *Task) error {
 		return has
 	}()
 	if addedTask {
+		g.GetLogger().WithField("task", task).
+			Error("task is added already, ignore it...")
 		return ErrAlreadyAddedTask
 	}
 
@@ -201,17 +205,17 @@ func (g *SharedPtr) Watch() chan<- Event {
 				switch event {
 				case EventNew, EventExpired:
 					if event == EventExpired {
-						g.Reset()
+						g.resetPtr()
 					}
 					// New x
 					_, err := g.GetWithRetry()
 					if err != nil {
-						g.GetLogger().WithError(err).Warn("Retry failed...")
+						g.GetLogger().WithField("event", event).WithError(err).Warn("handle event failed...")
 						continue
 					}
-					g.GetLogger().WithField("event", event.String()).Infof("handle event success...")
+					g.GetLogger().WithField("event", event).Infof("handle event success...")
 				case EventClose:
-					g.Reset()
+					g.resetPtr()
 				}
 			}
 		}
@@ -290,11 +294,8 @@ func (g *SharedPtr) Release() Ptr {
 
 // std::shared_ptr.reset()
 func (g *SharedPtr) Reset() {
-	x := g.Release()
-	if x != nil {
-		x.Close()
-	}
-	return
+	g.RemoveAllTask()
+	g.resetPtr()
 }
 
 // std::shared_ptr.get()
@@ -302,6 +303,15 @@ func (g *SharedPtr) Get() Ptr {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.x
+}
+
+// reset ptr and ready to start again
+func (g *SharedPtr) resetPtr() {
+	x := g.Release()
+	if x != nil {
+		x.Close()
+	}
+	return
 }
 
 func (g *SharedPtr) allocate() (Ptr, error) {
@@ -356,6 +366,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 
 			if task.State == TaskStateDormancy {
 				task.State = TaskStateNew
+				g.GetLogger().WithField("task", task).Info("recover task is successful...")
 				g.getTaskC() <- task
 			}
 		}
@@ -473,12 +484,12 @@ L:
 					func() {
 						waitBeforeRepeat := func() {
 							g.GetLogger().WithField("task", task).
-								Warnf("Reschedule to repeat in %s...", task.RepeatDuration)
+								Warnf("task is rescheduled to repeat in %s...", task.RepeatDuration)
 							<-time.After(task.RepeatDuration)
 						}
 						waitBeforeRecover := func() {
 							g.GetLogger().WithField("task", task).
-								Warnf("Reschedule to recover in %s...", task.RetryDuration)
+								Warnf("task is rescheduled to recover in %s...", task.RetryDuration)
 							<-time.After(task.RetryDuration)
 						}
 						select {
@@ -512,9 +523,9 @@ L:
 
 							if task.Type.Repeat && task.Type.Construct {
 								g.GetLogger().WithField("task", task).
-									Warnf("task is delete and restart all tasks...")
+									Warnf("task is rescheduled and restart all tasks...")
 								deleteTask(false) // don't recover this task, this task will be added later
-								g.Reset()
+								g.resetPtr()
 								go func() {
 									_, _ = g.GetWithRetry()
 								}()
@@ -528,9 +539,9 @@ L:
 								//Retry
 								if task.Type.Retry && task.State == TaskStateDoneErrorHappened {
 									g.GetLogger().WithField("task", task).
-										Warnf("task is delete and restart all tasks...")
+										Warnf("task is rescheduled and restart all tasks...")
 									deleteTask(false) // don't recover this task, this task will be added later
-									g.Reset()
+									g.resetPtr()
 									go func() {
 										_, _ = g.GetWithRetry()
 									}()
@@ -550,8 +561,8 @@ L:
 						select {
 						case <-task.Context().Done():
 							g.GetLogger().WithField("task", task).
-								Info("task is canceled, Go to death now...")
-							deleteTask(true)
+								Info("task is canceled, go to death now...")
+							deleteTask(false) // canceled already
 							return
 						default:
 							switch task.State {
@@ -559,7 +570,7 @@ L:
 								go func() {
 									deleteTask(false)
 									g.GetLogger().WithField("task", task).
-										Infof("Reschedule now...")
+										Infof("task is rescheduled now...")
 									g.getTaskC() <- task
 								}()
 							case TaskStateDormancy:
@@ -571,7 +582,7 @@ L:
 								fallthrough
 							default:
 								g.GetLogger().WithField("task", task).
-									Info("Go to death now...")
+									Info("task is with unexpect state, go to death now...")
 								deleteTask(true)
 							}
 						}
