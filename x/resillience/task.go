@@ -82,23 +82,23 @@ type Task struct {
 //
 // The returned context is always non-nil; it defaults to the
 // background context.
-func (g *Task) Context() context.Context {
-	if g.ctx != nil {
-		return g.ctx
+func (t *Task) Context() context.Context {
+	if t.ctx != nil {
+		return t.ctx
 	}
 	return context.Background()
 }
 
-func (g *Task) String() string {
-	if g == nil {
+func (t *Task) String() string {
+	if t == nil {
 		return "empty task"
 	}
-	return fmt.Sprintf("%s-%s", g.ID(), g.Description)
+	return fmt.Sprintf("%s-%s-%s", t.ID(), t.State, t.Description)
 }
 
-func (g *Task) ID() string {
-	if g == nil {
+func (t *Task) ID() string {
+	if t == nil {
 		return "empty task"
 	}
-	return fmt.Sprintf("%s-%p", g.Type, g.Handle)
+	return fmt.Sprintf("%s-%p", t.Type, t.Handle)
 }
