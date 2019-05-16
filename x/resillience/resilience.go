@@ -29,12 +29,6 @@ var (
 	ErrNotReady        = fmt.Errorf("not ready")
 )
 
-type Ptr interface {
-	Value() interface{} //actual instance
-	Ready() error
-	Close()
-}
-
 type SharedPtr struct {
 	// New optionally specifies a function to generate
 	// a value when Get would otherwise return nil.
@@ -92,26 +86,6 @@ func (g *SharedPtr) Context() context.Context {
 	return context.Background()
 }
 
-type Event int
-
-const (
-	EventNew     Event = iota // new and start
-	EventClose                // close
-	EventExpired              // restart
-)
-
-func (e Event) String() string {
-	switch e {
-	case EventNew:
-		return "new"
-	case EventClose:
-		return "close"
-	case EventExpired:
-		return "expired"
-	default:
-		return "unknown event"
-	}
-}
 func (g *SharedPtr) InShutdown() bool {
 	select {
 	case <-g.Context().Done():

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2015-2018 Aeneas Rekkas <aeneas+oss@aeneas.io>
+ * Copyright © 2019 searKing <searKingChan@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * @author		Aeneas Rekkas <aeneas+oss@aeneas.io>
- * @copyright 	2015-2018 Aeneas Rekkas <aeneas+oss@aeneas.io>
+ * @author		searKing <searKingChan@gmail.com>
+ * @copyright 	2019 searKing <searKingChan@gmail.com>
  * @license 	Apache-2.0
  */
 
@@ -39,7 +39,14 @@ func Retry(ctx context.Context, logger logrus.FieldLogger, maxWait time.Duration
 	}
 
 	err = errors.New("did not connect")
-	loopWait := time.Millisecond * 100
+	waitReform := func(wait time.Duration) time.Duration {
+		if wait > maxWait {
+			wait = maxWait
+		}
+		return wait
+	}
+
+	loopWait := waitReform(time.Millisecond * 100)
 	if failAfter != 0 {
 		cancelCtx, cancelFn := context.WithTimeout(ctx, failAfter)
 		defer cancelFn()
@@ -65,10 +72,7 @@ L:
 
 		// task takes too much time, keep the step
 		if time.Now().Before(start.Add(maxWait * 2)) {
-			loopWait = loopWait * 2
-		}
-		if loopWait > maxWait {
-			loopWait = maxWait
+			loopWait = waitReform(loopWait * 2)
 		}
 
 	}
