@@ -24,9 +24,10 @@ const (
 )
 
 var (
-	ErrEmptyValue      = fmt.Errorf("empty value")
-	ErrAlreadyShutdown = fmt.Errorf("already shutdown")
-	ErrNotReady        = fmt.Errorf("not ready")
+	ErrEmptyValue       = fmt.Errorf("empty value")
+	ErrAlreadyShutdown  = fmt.Errorf("already shutdown")
+	ErrNotReady         = fmt.Errorf("not ready")
+	ErrAlreadyAddedTask = fmt.Errorf("task is already added")
 )
 
 type SharedPtr struct {
@@ -49,7 +50,7 @@ type SharedPtr struct {
 
 	x      Ptr
 	taskC  chan *Task
-	tasks  map[*Task]struct{}
+	tasks  map[string]*Task
 	eventC chan Event
 
 	backgroundStopped atomic_.Bool
@@ -88,44 +89,38 @@ func (g *SharedPtr) InShutdown() bool {
 	}
 }
 
-func (g *SharedPtr) getTaskC() chan *Task {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.taskC == nil {
-		g.taskC = make(chan *Task)
-	}
-	return g.taskC
-}
-
-func (g *SharedPtr) AddTask(task *Task) {
+func (g *SharedPtr) AddTask(task *Task) error {
 	if g == nil || task == nil || task.Handle == nil {
-		return
+		g.GetLogger().WithField("task", task).
+			Warn("task is added already, ignore duplicate schedule...")
+		return ErrEmptyValue
 	}
 	if g.InShutdown() {
-		return
+		return ErrAlreadyShutdown
 	}
-	task.ctx = g.Context()
+	task.ctx, task.cancelFn = context.WithCancel(g.Context())
+
+	addedTask := func() (added bool) {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		if g.tasks == nil {
+			g.tasks = make(map[string]*Task)
+		}
+		_, has := g.tasks[task.ID()]
+		return has
+	}()
+	if addedTask {
+		return ErrAlreadyAddedTask
+	}
 
 	go func() {
-		if task.Type.Construct {
-			_, err := g.GetWithRetry()
-			if err != nil {
-				return
-			}
-		} else {
-			_, err := g.GetUntilReady()
-			if err != nil {
-				return
-			}
-		}
+		g.backgroundTask(false)
 		g.getTaskC() <- task
 	}()
+	return nil
 }
-func (g *SharedPtr) AddTaskFunc(taskType TaskType, handle func() error, descriptions ...string) {
-	if handle == nil || g == nil {
-		return
-	}
-	g.AddTask(&Task{
+func (g *SharedPtr) AddTaskFunc(taskType TaskType, handle func() error, descriptions ...string) error {
+	return g.AddTask(&Task{
 		Description:    strings.Join(descriptions, ""),
 		Type:           taskType,
 		Handle:         handle,
@@ -134,28 +129,57 @@ func (g *SharedPtr) AddTaskFunc(taskType TaskType, handle func() error, descript
 		ctx:            g.Context(),
 	})
 }
-func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...string) {
-	if handle == nil || g == nil {
-		return
-	}
-	g.AddTaskFunc(TaskType{Construct: true}, handle, descriptions...)
+func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...string) error {
+	return g.AddTaskFunc(TaskType{Construct: true}, handle, descriptions...)
 }
-func (g *SharedPtr) AddTaskFuncAsConstructRepeat(handle func() error, descriptions ...string) {
-	if handle == nil || g == nil {
-		return
-	}
-	g.AddTaskFunc(TaskType{Construct: true, Repeat: true}, handle, descriptions...)
+func (g *SharedPtr) AddTaskFuncAsConstructRepeat(handle func() error, descriptions ...string) error {
+	return g.AddTaskFunc(TaskType{Construct: true, Repeat: true}, handle, descriptions...)
 }
 
-func (g *SharedPtr) event() chan Event {
+func (g *SharedPtr) RemoveTask(task *Task) {
+	if g == nil || task == nil || task.Handle == nil {
+		return
+	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.eventC == nil {
-		g.eventC = make(chan Event)
+	if g.tasks == nil {
+		g.tasks = make(map[string]*Task)
 	}
-	return g.eventC
+	t, has := g.tasks[task.ID()]
+	if !has || t == nil {
+		return
+	}
+	if t.cancelFn != nil {
+		t.cancelFn()
+	}
+	delete(g.tasks, t.ID())
+	return
 }
 
+func (g *SharedPtr) RemoveAllTask() {
+	if g == nil {
+		return
+	}
+	g.RangeTasks(func(id string, task *Task) bool {
+		go g.RemoveTask(task)
+		return true
+	})
+
+}
+
+func (g *SharedPtr) RangeTasks(f func(id string, task *Task) bool) {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for id, task := range g.tasks {
+		if !f(id, task) {
+			break
+		}
+	}
+
+}
 func (g *SharedPtr) Watch() chan<- Event {
 	eventC := g.event()
 	go func() {
@@ -298,7 +322,7 @@ func (g *SharedPtr) allocateLocked() (Ptr, error) {
 }
 
 func (g *SharedPtr) recoveryTask(locked bool) {
-	tasks := func() map[*Task]struct{} {
+	tasks := func() map[string]*Task {
 		if !locked {
 			g.mu.Lock()
 			defer g.mu.Unlock()
@@ -309,7 +333,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 	}()
 	go func() {
 	L:
-		for task := range tasks {
+		for _, task := range tasks {
 			if task == nil {
 				continue
 			}
@@ -345,7 +369,7 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 			defer g.mu.Unlock()
 		}
 		if g.tasks == nil {
-			g.tasks = make(map[*Task]struct{})
+			g.tasks = make(map[string]*Task)
 		}
 	}()
 	go func() {
@@ -375,9 +399,9 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 					g.mu.Lock()
 					defer g.mu.Unlock()
 					if g.tasks == nil {
-						g.tasks = make(map[*Task]struct{})
+						g.tasks = make(map[string]*Task)
 					}
-					_, has := g.tasks[task]
+					_, has := g.tasks[task.ID()]
 					return has
 				}()
 
@@ -385,15 +409,15 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 					g.mu.Lock()
 					defer g.mu.Unlock()
 					if g.tasks == nil {
-						g.tasks = make(map[*Task]struct{})
+						g.tasks = make(map[string]*Task)
 					}
-					g.tasks[task] = struct{}{}
+					g.tasks[task.ID()] = task
 				}
 
 				deleteTask := func() {
 					g.mu.Lock()
 					defer g.mu.Unlock()
-					delete(g.tasks, task)
+					delete(g.tasks, task.ID())
 				}
 				if addedTask {
 					g.GetLogger().WithField("task", task).
@@ -551,4 +575,21 @@ func (g *SharedPtr) backgroundTask(locked bool) {
 		}
 
 	}()
+}
+
+func (g *SharedPtr) getTaskC() chan *Task {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.taskC == nil {
+		g.taskC = make(chan *Task)
+	}
+	return g.taskC
+}
+func (g *SharedPtr) event() chan Event {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.eventC == nil {
+		g.eventC = make(chan Event)
+	}
+	return g.eventC
 }
