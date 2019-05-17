@@ -502,7 +502,7 @@ L:
 								Warnf("task is rescheduled to repeat in %s...", task.RepeatDuration)
 							<-time.After(task.RepeatDuration)
 						}
-						waitBeforeRecover := func() {
+						waitBeforeRetry := func() {
 							g.GetLogger().WithField("task", task).
 								Warnf("task is rescheduled to recover in %s...", task.RetryDuration)
 							<-time.After(task.RetryDuration)
@@ -521,7 +521,7 @@ L:
 
 							if task.Type.Drop && task.Type.Retry {
 								if task.State == TaskStateDoneErrorHappened {
-									waitBeforeRecover()
+									waitBeforeRetry()
 									task.State = TaskStateNew
 									return
 								}
@@ -560,16 +560,31 @@ L:
 									go func() {
 										_, _ = g.GetWithRetry()
 									}()
-									waitBeforeRecover()
+									waitBeforeRetry()
 									task.State = TaskStateNew
 									return
 								}
 								task.State = TaskStateDormancy
 								return
 							}
+
+							// !Dop && !Repeat && !Construct
+							if task.Type.Retry {
+								if task.State == TaskStateDoneErrorHappened {
+									g.GetLogger().WithField("task", task).
+										Warnf("task is rescheduled ...")
+									deleteTask(false) // don't recover this task, this task will be added later
+									waitBeforeRetry()
+									task.State = TaskStateNew
+									return
+								}
+								task.State = TaskStateDeath
+								return
+							}
 							task.State = TaskStateDeath
 							return
 						}
+
 					}()
 					// complete the task's life cycle
 					func() {
