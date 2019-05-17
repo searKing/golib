@@ -611,7 +611,7 @@ L:
 							case TaskStateDeath:
 								g.GetLogger().WithField("task", task).
 									Infof("task is dead,  go to death...")
-								fallthrough
+								deleteTask(true)
 							default:
 								g.GetLogger().WithField("task", task).
 									Info("task is with unexpect state, go to death now...")
