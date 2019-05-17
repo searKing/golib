@@ -140,6 +140,12 @@ func (g *SharedPtr) AddTaskFuncAsConstruct(handle func() error, descriptions ...
 func (g *SharedPtr) AddTaskFuncAsConstructRepeat(handle func() error, descriptions ...string) error {
 	return g.AddTaskFunc(TaskType{Construct: true, Repeat: true}, handle, descriptions...)
 }
+func (g *SharedPtr) AddTaskFuncAsRepeat(handle func() error, descriptions ...string) error {
+	return g.AddTaskFunc(TaskType{Repeat: true}, handle, descriptions...)
+}
+func (g *SharedPtr) AddTaskFuncAsRetry(handle func() error, descriptions ...string) error {
+	return g.AddTaskFunc(TaskType{Retry: true}, handle, descriptions...)
+}
 
 func (g *SharedPtr) RemoveTask(task *Task) {
 	if g == nil || task == nil {
