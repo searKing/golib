@@ -11,6 +11,8 @@ type FieldLogger struct {
 	mu     sync.Mutex
 }
 
+var stdFieldLogger = New(nil)
+
 func New(l logrus.FieldLogger) *FieldLogger {
 	return &FieldLogger{
 		logger: l,
@@ -24,7 +26,7 @@ func (b *FieldLogger) Write(p []byte) (n int, err error) {
 
 func (b *FieldLogger) GetLogger() logrus.FieldLogger {
 	if b == nil {
-		return logrus.StandardLogger()
+		return stdFieldLogger.GetLogger()
 	}
 	if b.logger != nil {
 		return b.logger
@@ -33,6 +35,7 @@ func (b *FieldLogger) GetLogger() logrus.FieldLogger {
 	defer b.mu.Unlock()
 	if b.logger == nil {
 		b.logger = logrus.StandardLogger()
+		b.logger.Warning("No logger was set, defaulting to standard logger.")
 	}
 	return b.logger
 }
