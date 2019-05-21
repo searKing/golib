@@ -54,6 +54,7 @@ type SharedPtr struct {
 	eventC chan Event
 
 	backgroundStopped atomic_.Bool
+	watchStopped      atomic_.Bool
 
 	mu sync.Mutex
 }
@@ -199,7 +200,16 @@ func (g *SharedPtr) TaskIds() []string {
 
 func (g *SharedPtr) Watch() chan<- Event {
 	eventC := g.event()
+
 	go func() {
+		swapped := g.watchStopped.CAS(false, true)
+		if !swapped {
+			return
+		}
+
+		defer func() {
+			g.watchStopped.Store(false)
+		}()
 	L:
 		for {
 			select {
@@ -578,10 +588,10 @@ L:
 									task.State = TaskStateNew
 									return
 								}
-								task.State = TaskStateDeath
+								task.State = TaskStateDormancy
 								return
 							}
-							task.State = TaskStateDeath
+							task.State = TaskStateDormancy
 							return
 						}
 
