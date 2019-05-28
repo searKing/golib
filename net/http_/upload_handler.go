@@ -83,7 +83,12 @@ func NewUploadHandler(config tusd.Config) (*UploadHandler, error) {
 	l := log.New(nil)
 	l.SetStdLogger(config.Logger)
 
-	baseUrl, err := url.Parse(config.BasePath)
+	base := config.BasePath
+	// Ensure base path ends with slash to remove logic from absFileURL
+	if base != "" && string(base[len(base)-1]) != "/" {
+		base += "/"
+	}
+	baseUrl, err := url.Parse(base)
 	if err != nil {
 		return nil, errors.WithMessage(err, "malformed base path")
 
