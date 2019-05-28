@@ -24,6 +24,10 @@ func (b *FieldLogger) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+func (b *FieldLogger) GetStdLogger() *log.Logger {
+	return log.New(New(b.GetLogger()), "", 0)
+}
+
 func (b *FieldLogger) GetLogger() logrus.FieldLogger {
 	if b == nil {
 		return stdFieldLogger.GetLogger()
@@ -39,6 +43,7 @@ func (b *FieldLogger) GetLogger() logrus.FieldLogger {
 	}
 	return b.logger
 }
+
 func (b *FieldLogger) SetStdLogger(l *log.Logger) {
 	if l == nil {
 		return
@@ -47,6 +52,7 @@ func (b *FieldLogger) SetStdLogger(l *log.Logger) {
 	logger.Out = l.Writer()
 	b.SetLogger(logger)
 }
+
 func (b *FieldLogger) SetLogger(l logrus.FieldLogger) {
 	if b == nil {
 		return
