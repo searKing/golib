@@ -2,7 +2,7 @@ package http_
 
 import (
 	"github.com/bmizerany/pat"
-	"github.com/tus/tusd"
+	"github.com/searKing/tusd"
 	"net/http"
 )
 
@@ -50,6 +50,7 @@ func (handler *ResumableUploadHandler) Handler(id string) http.Handler {
 		h := handler.Middleware(m)
 
 		m.Post("", http.HandlerFunc(handler.PostFile))
+		m.Post(":id", http.HandlerFunc(handler.PostFile))
 		m.Head(":id", http.HandlerFunc(handler.HeadFile))
 		m.Patch(":id", http.HandlerFunc(handler.PatchFile))
 		m.Del(":id", http.HandlerFunc(handler.DelFile))
@@ -78,13 +79,13 @@ func (handler *ResumableUploadHandler) Middleware(h http.Handler) http.Handler {
 // new upload
 func (handler *ResumableUploadHandler) validateTusResumableDisableHeader(tusResumableDisableHeader string) (tusResumableDisabled bool, err error) {
 	haveInvalidDeferHeader := tusResumableDisableHeader != "" && tusResumableDisableHeader != TusResumableDisabled
-	tusIsDeferred := tusResumableDisableHeader == UploadLengthDeferred
+	tusIsDisabled := tusResumableDisableHeader == TusResumableDisabled
 
 	if haveInvalidDeferHeader {
 		err = ErrInvalidUploadDeferLength
 		return
 	}
-	if tusIsDeferred {
+	if tusIsDisabled {
 		tusResumableDisabled = true
 		return
 	}

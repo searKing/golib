@@ -5,14 +5,13 @@ import (
 	"errors"
 	"github.com/bmizerany/pat"
 	"github.com/searKing/golib/x/log"
-	"github.com/tus/tusd"
+	"github.com/searKing/tusd"
 	"io"
 	"math"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -84,6 +83,11 @@ type UploadHandler struct {
 	http.Handler
 
 	MaxSize int64
+	// BasePath defines the URL path used for handling uploads, e.g. "/files/".
+	// If no trailing slash is presented it will be added. You may specify an
+	// absolute URL containing a scheme, e.g. "http://tus.io"
+	BasePath *url.URL
+
 	*log.FieldLogger
 
 	// CompleteUploads is used to send notifications whenever an upload is
@@ -127,6 +131,12 @@ type UploadHandler struct {
 func NewUploadHandler(config tusd.Config) (*UploadHandler, error) {
 	l := log.New(nil)
 	l.SetStdLogger(config.Logger)
+
+	baseUrl, err := url.Parse(config.BasePath)
+	if err != nil {
+		return nil, err
+
+	}
 	handler := &UploadHandler{
 		composer:                config.StoreComposer,
 		CompleteUploads:         make(chan tusd.FileInfo),
@@ -139,6 +149,7 @@ func NewUploadHandler(config tusd.Config) (*UploadHandler, error) {
 		NotifyUploadProgress:    config.NotifyUploadProgress,
 		NotifyCreatedUploads:    config.NotifyCreatedUploads,
 		MaxSize:                 config.MaxSize,
+		BasePath:                baseUrl,
 	}
 
 	handler.Handler = handler.newHandler()
@@ -217,8 +228,13 @@ func (handler *UploadHandler) Middleware(h http.Handler) http.Handler {
 // PostFile creates a new file upload using the datastore after validating the
 // length and parsing the metadata.
 func (handler *UploadHandler) PostFile(w http.ResponseWriter, r *http.Request) {
+	uploadId, err := extractIDFromPath(r.URL.Path)
+	if err != nil {
+		uploadId = "" // generate by file store
+	}
 
 	info := tusd.FileInfo{
+		ID:             uploadId,
 		SizeIsDeferred: true,
 		IsFinal:        true,
 	}
@@ -233,7 +249,11 @@ func (handler *UploadHandler) PostFile(w http.ResponseWriter, r *http.Request) {
 
 	// Add the Location header directly after creating the new resource to even
 	// include it in cases of failure when an error is returned
-	url := handler.absFileURL(r, id)
+	url, err := handler.absFileURL(r, id)
+	if err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
 	w.Header().Set("Location", url)
 
 	if handler.NotifyCreatedUploads {
@@ -300,7 +320,15 @@ func (handler *UploadHandler) HeadFile(w http.ResponseWriter, r *http.Request) {
 	if info.IsFinal {
 		v := "final;"
 		for _, uploadID := range info.PartialUploads {
-			v += handler.absFileURL(r, uploadID) + " "
+			partialUploadUrl, err := handler.absFileURL(r, uploadID)
+			if err != nil {
+				handler.GetLogger().WithField("upload_id", uploadID).
+					WithField("base_url", handler.BasePath).WithError(err)
+				handler.sendError(w, r, err)
+				return
+			}
+
+			v += partialUploadUrl + " "
 		}
 		// Remove trailing space
 		v = v[:len(v)-1]
@@ -705,14 +733,25 @@ func (handler *UploadHandler) sendResp(w http.ResponseWriter, r *http.Request, s
 
 // Make an absolute URLs to the given upload id. If the base path is absolute
 // it will be prepended else the host and protocol from the request is used.
-func (handler *UploadHandler) absFileURL(r *http.Request, id string) string {
+func (handler *UploadHandler) absFileURL(r *http.Request, id string) (string, error) {
+	idUrl, err := url.Parse(id)
+	if err != nil {
+		return "", err
+	}
 
-	scheme, host := getSchemeAndHost(r, true)
-	url, _ := url.Parse(path.Join(r.URL.Path, id))
-	url = r.URL.ResolveReference(url)
-	url.Host = host
-	url.Scheme = scheme
-	return url.String()
+	fileUrl := idUrl
+	if handler.BasePath != nil {
+		fileUrl = handler.BasePath.ResolveReference(idUrl)
+
+		if handler.BasePath.IsAbs() {
+			return fileUrl.String(), nil
+		}
+	}
+	fileUrl = r.URL.ResolveReference(fileUrl)
+
+	fileProxyUrl := ResolveProxyUrl(fileUrl, r, true)
+
+	return fileProxyUrl.String(), nil
 }
 
 type progressWriter struct {
@@ -757,44 +796,6 @@ func (handler *UploadHandler) sendProgressMessages(info tusd.FileInfo, reader io
 	}()
 
 	return reader, stop
-}
-
-// getHostAndProtocol extracts the host and used protocol (either HTTP or HTTPS)
-// from the given request. If `allowForwarded` is set, the X-Forwarded-Host,
-// X-Forwarded-Proto and Forwarded headers will also be checked to
-// support proxies.
-func getHostAndProtocol(r *http.Request, allowForwarded bool) (host, proto string) {
-	if r.TLS != nil {
-		proto = "https"
-	} else {
-		proto = "http"
-	}
-
-	host = r.Host
-
-	if !allowForwarded {
-		return
-	}
-
-	if h := r.Header.Get("X-Forwarded-Host"); h != "" {
-		host = h
-	}
-
-	if h := r.Header.Get("X-Forwarded-Proto"); h == "http" || h == "https" {
-		proto = h
-	}
-
-	if h := r.Header.Get("Forwarded"); h != "" {
-		if r := reForwardedHost.FindStringSubmatch(h); len(r) == 2 {
-			host = r[1]
-		}
-
-		if r := reForwardedProto.FindStringSubmatch(h); len(r) == 2 {
-			proto = r[1]
-		}
-	}
-
-	return
 }
 
 // The get sum of all sizes for a list of upload ids while checking whether
@@ -890,49 +891,6 @@ func SerializeMetadataHeader(meta map[string]string) string {
 	return header
 }
 
-// Parse the Upload-Concat header, e.g.
-// Upload-Concat: partial
-// Upload-Concat: final;http://tus.io/files/a /files/b/
-func parseConcat(header string) (isPartial bool, isFinal bool, partialUploads []string, err error) {
-	if len(header) == 0 {
-		return
-	}
-
-	if header == "partial" {
-		isPartial = true
-		return
-	}
-
-	l := len("final;")
-	if strings.HasPrefix(header, "final;") && len(header) > l {
-		isFinal = true
-
-		list := strings.Split(header[l:], " ")
-		for _, value := range list {
-			value := strings.TrimSpace(value)
-			if value == "" {
-				continue
-			}
-
-			id, extractErr := extractIDFromPath(value)
-			if extractErr != nil {
-				err = extractErr
-				return
-			}
-
-			partialUploads = append(partialUploads, id)
-		}
-	}
-
-	// If no valid partial upload ids are extracted this is not a final upload.
-	if len(partialUploads) == 0 {
-		isFinal = false
-		err = ErrInvalidConcat
-	}
-
-	return
-}
-
 // extractIDFromPath pulls the last segment from the url provided
 func extractIDFromPath(url string) (string, error) {
 	result := reExtractFileID.FindStringSubmatch(url)
@@ -940,46 +898,4 @@ func extractIDFromPath(url string) (string, error) {
 		return "", ErrNotFound
 	}
 	return result[1], nil
-}
-
-func i64toa(num int64) string {
-	return strconv.FormatInt(num, 10)
-}
-
-// getHostAndProtocol extracts the host and used protocol (either HTTP or HTTPS)
-// from the given request. If `allowForwarded` is set, the X-Forwarded-Host,
-// X-Forwarded-Proto and Forwarded headers will also be checked to
-// support proxies.
-func getSchemeAndHost(r *http.Request, allowForwarded bool) (scheme, host string) {
-	if r.TLS != nil {
-		scheme = "https"
-	} else {
-		scheme = "http"
-	}
-
-	host = r.Host
-
-	if !allowForwarded {
-		return
-	}
-
-	if h := r.Header.Get("X-Forwarded-Host"); h != "" {
-		host = h
-	}
-
-	if h := r.Header.Get("X-Forwarded-Proto"); h == "http" || h == "https" {
-		scheme = h
-	}
-
-	if h := r.Header.Get("Forwarded"); h != "" {
-		if r := reForwardedHost.FindStringSubmatch(h); len(r) == 2 {
-			host = r[1]
-		}
-
-		if r := reForwardedProto.FindStringSubmatch(h); len(r) == 2 {
-			scheme = r[1]
-		}
-	}
-
-	return
 }
