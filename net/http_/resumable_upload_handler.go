@@ -51,6 +51,7 @@ func (handler *ResumableUploadHandler) Handler(id string) http.Handler {
 
 		m.Post("", http.HandlerFunc(handler.PostFile))
 		m.Post(":id", http.HandlerFunc(handler.PostFile))
+		m.Put(":id", http.HandlerFunc(handler.PutFile))
 		m.Head(":id", http.HandlerFunc(handler.HeadFile))
 		m.Patch(":id", http.HandlerFunc(handler.PatchFile))
 		m.Del(":id", http.HandlerFunc(handler.DelFile))
@@ -66,7 +67,7 @@ func (handler *ResumableUploadHandler) Handler(id string) http.Handler {
 // this middleware.
 func (handler *ResumableUploadHandler) Middleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Tus-Resumable") == "" && r.Method != "PUT" && r.Method != "PATCH" {
+		if r.Header.Get("Tus-Resumable") == "" {
 			// Set current version used by the server
 			r.Header.Set("Tus-Resumable", "1.0.0")
 			r.Header.Set("Tus-Resumable-Disable", TusResumableDisabled)
@@ -82,7 +83,7 @@ func (handler *ResumableUploadHandler) validateTusResumableDisableHeader(tusResu
 	tusIsDisabled := tusResumableDisableHeader == TusResumableDisabled
 
 	if haveInvalidDeferHeader {
-		err = ErrInvalidUploadDeferLength
+		err = tusd.ErrInvalidUploadDeferLength
 		return
 	}
 	if tusIsDisabled {
@@ -101,6 +102,18 @@ func (handler *ResumableUploadHandler) PostFile(w http.ResponseWriter, r *http.R
 		return
 	}
 	handler.uploadHandler.PostFile(w, r)
+	return
+}
+
+// PutFile upgrades a new file upload using the datastore after validating the
+// length and parsing the metadata.
+func (handler *ResumableUploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
+	tusResumableDisabled, err := handler.validateTusResumableDisableHeader(r.Header.Get("Tus-Resumable-Disable"))
+	if err != nil || !tusResumableDisabled {
+		handler.tusdHandler.PutFile(w, r)
+		return
+	}
+	handler.uploadHandler.PutFile(w, r)
 	return
 }
 
