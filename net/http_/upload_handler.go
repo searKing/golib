@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -23,7 +24,7 @@ var (
 	reExtractFileID  = regexp.MustCompile(`([^/]+)\/?$`)
 	reForwardedHost  = regexp.MustCompile(`host=([^,]+)`)
 	reForwardedProto = regexp.MustCompile(`proto=(https?)`)
-	reMimeType       = regexp.MustCompile(`^[a-z]+\/[a-z\-\+]+$`)
+	reMimeType       = regexp.MustCompile(`^[a-z]+\/[a-z\-\+0-9]+$`)
 )
 
 // UploadHandler exposes methods to handle requests as part of the tus protocol,
@@ -156,9 +157,6 @@ func (handler *UploadHandler) Middleware(h http.Handler) http.Handler {
 				header.Add("Access-Control-Expose-Headers", "Upload-Offset, Location, Content-Length, Upload-Metadata")
 			}
 		}
-
-		// Add nosniff to all responses https://golang.org/src/net/http/server.go#L1429
-		header.Set("X-Content-Type-Options", "nosniff")
 
 		// Set appropriated headers in case of OPTIONS method allowing protocol
 		// discovery and end with an 204 No Content
@@ -390,15 +388,15 @@ func (handler *UploadHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if handler.composer.UsesLocker {
-		locker := handler.composer.Locker
-		if err := locker.LockUpload(id); err != nil {
-			handler.sendError(w, r, err)
-			return
-		}
-
-		defer locker.UnlockUpload(id)
-	}
+	//if handler.composer.UsesLocker {
+	//	locker := handler.composer.Locker
+	//	if err := locker.LockUpload(id); err != nil {
+	//		handler.sendError(w, r, err)
+	//		return
+	//	}
+	//
+	//	defer locker.UnlockUpload(id)
+	//}
 
 	info, err := handler.composer.Core.GetInfo(id)
 	if err != nil {
@@ -409,9 +407,10 @@ func (handler *UploadHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 	// Set headers before sending responses
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Offset, 10))
 
-	contentType, contentDisposition := filterContentType(info)
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Content-Disposition", contentDisposition)
+	fileType, fileName := extractFileInfo(info)
+	if fileType != "" {
+		w.Header().Set("Content-Type", fileType)
+	}
 
 	// If no data has been uploaded yet, respond with an empty "204 No Content" status.
 	if info.Offset == 0 {
@@ -425,13 +424,13 @@ func (handler *UploadHandler) GetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.sendResp(w, r, http.StatusOK)
-	io.Copy(w, src)
+	ServeContent(w, r, fileName, time.Time{}, src, info.Offset)
 
 	// Try to close the reader if the io.Closer interface is implemented
 	if closer, ok := src.(io.Closer); ok {
 		closer.Close()
 	}
+
 }
 
 // DelFile terminates an upload permanently.
@@ -481,65 +480,19 @@ func (handler *UploadHandler) DelFile(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// mimeInlineBrowserWhitelist is a map containing MIME types which should be
-// allowed to be rendered by browser inline, instead of being forced to be
-// downloadd. For example, HTML or SVG files are not allowed, since they may
-// contain malicious JavaScript. In a similiar fashion PDF is not on this list
-// as their parsers commonly contain vulnerabilities which can be exploited.
-// The values of this map does not convei any meaning and are therefore just
-// empty structs.
-var mimeInlineBrowserWhitelist = map[string]struct{}{
-	"text/plain": struct{}{},
-
-	"image/png":  struct{}{},
-	"image/jpeg": struct{}{},
-	"image/gif":  struct{}{},
-	"image/bmp":  struct{}{},
-	"image/webp": struct{}{},
-
-	"audio/wave":      struct{}{},
-	"audio/wav":       struct{}{},
-	"audio/x-wav":     struct{}{},
-	"audio/x-pn-wav":  struct{}{},
-	"audio/webm":      struct{}{},
-	"video/webm":      struct{}{},
-	"audio/ogg":       struct{}{},
-	"video/ogg ":      struct{}{},
-	"application/ogg": struct{}{},
-}
-
-// filterContentType returns the values for the Content-Type and
+// extractFileInfo returns the values for the Content-Type and
 // Content-Disposition headers for a given upload. These values should be used
 // in responses for GET requests to ensure that only non-malicious file types
 // are shown directly in the browser. It will extract the file name and type
 // from the "fileame" and "filetype".
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Disposition
-func filterContentType(info tusd.FileInfo) (contentType string, contentDisposition string) {
-	filetype := info.MetaData["filetype"]
-
-	if reMimeType.MatchString(filetype) {
-		// If the filetype from metadata is well formed, we forward use this
-		// for the Content-Type header. However, only whitelisted mime types
-		// will be allowed to be shown inline in the browser
-		contentType = filetype
-		if _, isWhitelisted := mimeInlineBrowserWhitelist[filetype]; isWhitelisted {
-			contentDisposition = "inline"
-		} else {
-			contentDisposition = "attachment"
-		}
-	} else {
-		// If the filetype from the metadata is not well formed, we use a
-		// default type and force the browser to download the content.
-		contentType = "application/octet-stream"
-		contentDisposition = "attachment"
-	}
-
+func extractFileInfo(info tusd.FileInfo) (filetype string, filename string) {
 	// Add a filename to Content-Disposition if one is available in the metadata
-	if filename, ok := info.MetaData["filename"]; ok {
-		contentDisposition += ";filename=" + strconv.Quote(filename)
-	}
+	filename = info.MetaData["filename"]
 
-	return contentType, contentDisposition
+	filetype = strings.TrimSpace(info.MetaData["filetype"])
+
+	return filetype, filename
 }
 
 // writeChunk reads the body from the requests r and appends it to the upload
