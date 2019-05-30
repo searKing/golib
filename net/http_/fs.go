@@ -74,7 +74,14 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 	readseeker, seekable := content.(io.ReadSeeker)
 
 	// generate a onlySizeSeekable as a pseudo io.ReadSeeker
-	if seekable {
+	if !seekable {
+
+		rangeReq := r.Header.Get("Range")
+		if rangeReq != "" {
+			http.Error(w, "range is not support", http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+
 		// Content-Type must be set here, avoid sniff in http.ServeContent for onlySizeSeekable later
 		// If Content-Type isn't set, use the file's extension to find it, but
 		// if the Content-Type is unset explicitly, do not sniff the type.
@@ -97,12 +104,6 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 			// to reject unsupported Range
 			w.Header().Del("Content-Length")
 			w.Header().Set("Content-Encoding", "chunked")
-
-			rangeReq := r.Header.Get("Range")
-			if rangeReq != "" {
-				http.Error(w, "range is not support", http.StatusRequestedRangeNotSatisfiable)
-				return
-			}
 
 			// Use HTTP Trunk or connection close later
 			defer func() {
