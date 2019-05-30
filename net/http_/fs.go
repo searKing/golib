@@ -71,7 +71,6 @@ func ContentType(content io.Reader, name string) (ctype string, bufferedContent 
 //
 // Note that *os.File implements the io.ReadSeeker interface.
 func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime time.Time, content io.Reader, size int64) {
-	size = -1
 	readseeker, seekable := content.(io.ReadSeeker)
 
 	// generate a onlySizeSeekable as a pseudo io.ReadSeeker
