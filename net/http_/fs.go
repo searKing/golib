@@ -43,17 +43,77 @@ func ContentType(content io.Reader, name string) (ctype string, bufferedContent 
 	return ctype, content, nil
 }
 
+// ServeContent replies to the request using the content in the
+// provided Reader. The main benefit of ServeContent over io.Copy
+// is that it handles Range requests properly, sets the MIME type, and
+// handles If-Match, If-Unmodified-Since, If-None-Match, If-Modified-Since,
+// and If-Range requests.
+//
+// If the response's Content-Type header is not set, ServeContent
+// first tries to deduce the type from name's file extension and,
+// if that fails, falls back to reading the first block of the content
+// and passing it to DetectContentType.
+// The name is otherwise unused; in particular it can be empty and is
+// never sent in the response.
+//
+// If modtime is not the zero time or Unix epoch, ServeContent
+// includes it in a Last-Modified header in the response. If the
+// request includes an If-Modified-Since header, ServeContent uses
+// modtime to decide whether the content needs to be sent at all.
+//
+// If the content's Seek method work: ServeContent uses
+// a seek to the end of the content to determine its size, and the param size is ignored. The same as http.ServeFile
+// If the content's Seek method doesn't work: ServeContent uses the param size
+// to generate a onlySizeSeekable as a pseudo io.ReadSeeker. If size < 0, use chunk or connection close instead
+//
+// If the caller has set w's ETag header formatted per RFC 7232, section 2.3,
+// ServeContent uses it to handle requests using If-Match, If-None-Match, or If-Range.
+//
+// Note that *os.File implements the io.ReadSeeker interface.
 func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime time.Time, content io.Reader, size int64) {
-	readseeker, ok := content.(io.ReadSeeker)
-	if !ok {
-		ctype, content, err := ContentType(content, name)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+	size = -1
+	readseeker, seekable := content.(io.ReadSeeker)
+
+	// generate a onlySizeSeekable as a pseudo io.ReadSeeker
+	if seekable {
+		// Content-Type must be set here, avoid sniff in http.ServeContent for onlySizeSeekable later
+		// If Content-Type isn't set, use the file's extension to find it, but
+		// if the Content-Type is unset explicitly, do not sniff the type.
+		ctypes, haveType := w.Header()["Content-Type"]
+		var ctype string
+		if !haveType {
+			var err error
+			ctype, content, err = ContentType(content, name)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else if len(ctypes) > 0 {
+			ctype = ctypes[0]
 		}
 
 		w.Header().Set("Content-Type", ctype)
 
-		readseeker = newServeContentSeekable(content, size)
+		if size < 0 {
+			// to reject unsupported Range
+			w.Header().Del("Content-Length")
+			w.Header().Set("Content-Encoding", "chunked")
+
+			rangeReq := r.Header.Get("Range")
+			if rangeReq != "" {
+				http.Error(w, "range is not support", http.StatusRequestedRangeNotSatisfiable)
+				return
+			}
+
+			// Use HTTP Trunk or connection close later
+			defer func() {
+				if r.Method != "HEAD" {
+					_, _ = io.Copy(w, content)
+				}
+			}()
+		}
+
+		readseeker = newOnlySizeSeekable(content, size)
 	}
 
 	if modtime.IsZero() {
@@ -65,23 +125,26 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 		}
 	}
 	http.ServeContent(w, r, name, modtime, readseeker)
+
+	// Use HTTP Trunk or connection close by defer
+
 	return
 }
 
 // can only be used for ServeContent
-type serveContentSeekable struct {
+type onlySizeSeekable struct {
 	io.Reader
 	size int64
 }
 
-func newServeContentSeekable(r io.Reader, size int64) *serveContentSeekable {
-	return &serveContentSeekable{
+func newOnlySizeSeekable(r io.Reader, size int64) *onlySizeSeekable {
+	return &onlySizeSeekable{
 		Reader: r,
 		size:   size,
 	}
 }
 
-func (s *serveContentSeekable) Seek(offset int64, whence int) (int64, error) {
+func (s *onlySizeSeekable) Seek(offset int64, whence int) (int64, error) {
 	if offset != 0 {
 		return 0, os.ErrInvalid
 	}
