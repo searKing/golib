@@ -189,6 +189,27 @@ func (handler *UploadHandler) PostFile(w http.ResponseWriter, r *http.Request) {
 		uploadId = "" // generate by file store
 	}
 
+	if uploadId != "" {
+		info, err := handler.composer.Core.GetInfo(uploadId)
+		if err == nil {
+			w.Header().Set("Upload-Offset", strconv.FormatInt(info.Offset, 10))
+
+			// If a resource has been created on the origin server, the response SHOULD be 201 (Created)
+			// and contain an entity which describes
+			// the status of the request and refers to the new resource, and a Location header
+			// Add the Location header directly after creating the new resource to even
+			// include it in cases of failure when an error is returned
+			url, err := handler.absFileURL(r, uploadId)
+			if err != nil {
+				handler.sendError(w, r, err)
+				return
+			}
+			w.Header().Set("Location", url)
+			handler.sendResp(w, r, http.StatusCreated)
+			return
+		}
+	}
+
 	info := tusd.FileInfo{
 		ID:             uploadId,
 		SizeIsDeferred: true,
