@@ -264,54 +264,79 @@ func (handler *UploadHandler) PostFile(w http.ResponseWriter, r *http.Request) {
 	handler.sendResp(w, r, http.StatusCreated)
 }
 
-// PutFile upgrades a new file upload using the datastore after validating the
-// length and parsing the metadata.
-func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
-	id, err := extractIDFromPath(r.URL.Path)
-	if err != nil {
-		handler.sendError(w, r, err)
-		return
-	}
-
+// It may return an tusd.ErrNotFound which will be interpreted as a
+// 404 Not Found.
+func (handler *UploadHandler) deleteFile(id string) error {
 	if handler.composer.UsesLocker {
 		locker := handler.composer.Locker
 		if err := locker.LockUpload(id); err != nil {
-			handler.sendError(w, r, err)
-			return
+			return err
 		}
 
 		defer locker.UnlockUpload(id)
 	}
 
 	info, err := handler.composer.Core.GetInfo(id)
+	// Interpret os.ErrNotExist as 404 Not Found
+	if os.IsNotExist(err) {
+		err = tusd.ErrNotFound
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Abort the request handling if the required interface is not implemented
+	if !handler.composer.UsesTerminater {
+		return tusd.ErrNotImplemented
+	}
+
+	err = handler.composer.Terminater.Terminate(id)
+	if err != nil {
+		return err
+	}
+
+	if handler.NotifyTerminatedUploads {
+		handler.TerminatedUploads <- info
+	}
+
+	return nil
+}
+
+// https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html 9.6 PUT
+// PutFile upgrades a new file upload using the datastore after validating the
+// length and parsing the metadata.
+// If a new resource is created, the origin server MUST inform the user agent via the 201 (Created) response.
+// If an existing resource is modified, either the 200 (OK) or 204 (No Content) response codes SHOULD be sent to indicate successful completion of the request.
+// If the resource could not be created or modified with the Request-URI, an appropriate error response SHOULD be given that reflects the nature of the problem.
+func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
+	var created bool
+	id, err := extractIDFromPath(r.URL.Path)
 	if err != nil {
 		handler.sendError(w, r, err)
 		return
 	}
 
-	// If data has been uploaded already, delete this data.
-	if info.Offset != 0 {
-		// Abort the request handling if the required interface is not implemented
-		if !handler.composer.UsesTerminater {
-			handler.sendError(w, r, tusd.ErrNotImplemented)
-			return
-		}
+	rangeReq := r.Header.Get("Content-Range")
+	if rangeReq != "" {
+		http.Error(w, "range is not support", http.StatusRequestedRangeNotSatisfiable)
+		return
+	}
 
-		err = handler.composer.Terminater.Terminate(id)
-		if err != nil {
+	err = handler.deleteFile(id)
+	if err != nil {
+		if err != tusd.ErrNotFound {
 			handler.sendError(w, r, err)
 			return
 		}
-
-		if handler.NotifyTerminatedUploads {
-			handler.TerminatedUploads <- info
-		}
+		// Handle 404 Not Found
+		created = true
 	}
 
 	// POST new data
 
-	info = tusd.FileInfo{
-		ID:             info.ID,
+	info := tusd.FileInfo{
+		ID:             id,
 		SizeIsDeferred: true,
 		IsFinal:        true,
 	}
@@ -352,7 +377,11 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.sendResp(w, r, http.StatusCreated)
+	if created {
+		handler.sendResp(w, r, http.StatusCreated)
+		return
+	}
+	handler.sendResp(w, r, http.StatusOK)
 }
 
 // HeadFile returns the length and offset for the HEAD request
