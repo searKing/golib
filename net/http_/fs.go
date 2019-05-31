@@ -116,6 +116,7 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 		readseeker = newOnlySizeSeekable(content, size)
 	}
 
+	readseeker = io_.LimitReadSeeker(readseeker, size)
 	if modtime.IsZero() {
 		modtime = time.Now()
 	}
