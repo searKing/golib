@@ -1,10 +1,12 @@
 package http_
 
 import (
+	"fmt"
 	"github.com/bmizerany/pat"
 	"github.com/pkg/errors"
 	"github.com/searKing/golib/x/log"
 	"github.com/searKing/tusd"
+	"github.com/searKing/tusd/filestore"
 	"io"
 	"math"
 	"net"
@@ -250,7 +252,9 @@ func (handler *UploadHandler) PostFile(w http.ResponseWriter, r *http.Request) {
 
 		defer locker.UnlockUpload(id)
 	}
-	uploadLength, err := handler.writeChunk(id, info, w, r)
+	// Get Content-Length if possible
+	length := r.ContentLength
+	uploadLength, err := handler.writeChunk(id, info, length, w, r)
 	if err != nil {
 		handler.sendError(w, r, err)
 		return
@@ -366,7 +370,9 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 		handler.CompleteUploads <- info
 	}
 
-	uploadLength, err := handler.writeChunk(id, info, w, r)
+	// Get Content-Length if possible
+	length := r.ContentLength
+	uploadLength, err := handler.writeChunk(id, info, length, w, r)
 	if err != nil {
 		handler.sendError(w, r, err)
 		return
@@ -381,7 +387,7 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 		handler.sendResp(w, r, http.StatusCreated)
 		return
 	}
-	handler.sendResp(w, r, http.StatusOK)
+	handler.sendResp(w, r, http.StatusNoContent)
 }
 
 // HeadFile returns the length and offset for the HEAD request
@@ -421,7 +427,99 @@ func (handler *UploadHandler) HeadFile(w http.ResponseWriter, r *http.Request) {
 // PatchFile adds a chunk to an upload. This operation is only allowed
 // if enough space in the upload is left.
 func (handler *UploadHandler) PatchFile(w http.ResponseWriter, r *http.Request) {
-	handler.sendError(w, r, tusd.ErrNotImplemented)
+	id, err := extractIDFromPath(r.URL.Path)
+	if err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
+
+	if handler.composer.UsesLocker {
+		locker := handler.composer.Locker
+		if err := locker.LockUpload(id); err != nil {
+			handler.sendError(w, r, err)
+			return
+		}
+
+		defer locker.UnlockUpload(id)
+	}
+
+	info, err := handler.composer.Core.GetInfo(id)
+	if err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
+
+	if r.ContentLength == 0 && info.SizeIsDeferred {
+		if err := handler.composer.LengthDeferrer.DeclareLength(id, info.Offset); err != nil {
+			handler.sendError(w, r, err)
+			return
+		}
+		handler.sendResp(w, r, http.StatusNoContent)
+	}
+
+	var size = info.Size
+	if info.SizeIsDeferred {
+		size = -1
+	}
+
+	// Test whether the size is still allowed
+	if handler.MaxSize > 0 && size > handler.MaxSize {
+		handler.sendError(w, r, tusd.ErrMaxSizeExceeded)
+		return
+	}
+
+	ranges, err := parseContentRanges(r.Header["Content-Range"])
+	if err != nil {
+		if err == errNoOverlap {
+			if size < 0 {
+				w.Header().Set("Content-Range", "bytes */*")
+			} else {
+				w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", size))
+			}
+		}
+		handler.sendResp(w, r, http.StatusRequestedRangeNotSatisfiable)
+		return
+	}
+
+	if len(ranges) == 0 {
+		ranges = append(ranges, httpContentRange{
+			firstBytePos:   0,
+			lastBytePos:    r.ContentLength - 1,
+			completeLength: r.ContentLength,
+		})
+	}
+
+	if len(ranges) > 0 && ranges[0].completeLength > size {
+		// The total number of bytes in all the ranges
+		// is larger than the size of the file by
+		// itself, so this is probably an attack, or a
+		// dumb client. Ignore the range request.
+		ranges = nil
+	}
+
+	// check if seek is needed, else only append mode can be done
+	if _, ok := handler.composer.Core.(filestore.FileStore); !ok {
+		for _, ra := range ranges {
+			if ra.firstBytePos != info.Offset {
+				handler.sendResp(w, r, http.StatusRequestedRangeNotSatisfiable)
+				return
+			}
+		}
+	}
+
+	for _, ra := range ranges {
+		info.Offset = ra.firstBytePos
+
+		_, err := handler.writeChunk(id, info, ra.lastBytePos-ra.firstBytePos+1, w, r)
+		if err != nil {
+			handler.sendError(w, r, err)
+			return
+		}
+	}
+	writeContentRanges(w, ranges)
+
+	w.Header().Set("Accept-Ranges", "bytes")
+	handler.sendResp(w, r, http.StatusNoContent)
 }
 
 // GetFile handles requests to download a file using a GET request. This is not
@@ -548,9 +646,7 @@ func extractFileInfo(info tusd.FileInfo) (filetype string, filename string) {
 // writeChunk reads the body from the requests r and appends it to the upload
 // with the corresponding id. Afterwards, it will set the necessary response
 // headers but will not send the response.
-func (handler *UploadHandler) writeChunk(id string, info tusd.FileInfo, w http.ResponseWriter, r *http.Request) (int64, error) {
-	// Get Content-Length if possible
-	length := r.ContentLength
+func (handler *UploadHandler) writeChunk(id string, info tusd.FileInfo, length int64, w http.ResponseWriter, r *http.Request) (int64, error) {
 	offset := info.Offset
 
 	// Test if this upload fits into the file's size
@@ -736,6 +832,27 @@ func (handler *UploadHandler) sendProgressMessages(info tusd.FileInfo, reader io
 	}()
 
 	return reader, stop
+}
+
+// The get sum of all sizes for a list of upload ids while checking whether
+// all of these uploads are finished yet. This is used to calculate the size
+// of a final resource.
+func (handler *UploadHandler) sizeOfUploads(ids []string) (size int64, err error) {
+	for _, id := range ids {
+		info, err := handler.composer.Core.GetInfo(id)
+		if err != nil {
+			return size, err
+		}
+
+		if info.SizeIsDeferred || info.Offset != info.Size {
+			err = tusd.ErrUploadNotFinished
+			return size, err
+		}
+
+		size += info.Size
+	}
+
+	return
 }
 
 // extractIDFromPath pulls the last segment from the url provided
