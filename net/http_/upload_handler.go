@@ -420,7 +420,12 @@ func (handler *UploadHandler) HeadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Length", strconv.FormatInt(info.Offset, 10))
+	cr := httpContentRange{
+		firstBytePos:   0,
+		lastBytePos:    info.Offset - 1,
+		completeLength: info.Size,
+	}
+	w.Header().Set("Content-Range", cr.contentRange())
 	handler.sendResp(w, r, http.StatusOK)
 }
 
