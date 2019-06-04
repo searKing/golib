@@ -134,14 +134,15 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 
 // can only be used for ServeContent
 type onlySizeSeekable struct {
-	io.Reader
-	size int64
+	r      io.Reader
+	size   int64
+	offset int64
 }
 
 func newOnlySizeSeekable(r io.Reader, size int64) *onlySizeSeekable {
 	return &onlySizeSeekable{
-		Reader: r,
-		size:   size,
+		r:    r,
+		size: size,
 	}
 }
 
@@ -150,10 +151,21 @@ func (s *onlySizeSeekable) Seek(offset int64, whence int) (int64, error) {
 		return 0, os.ErrInvalid
 	}
 	if whence == io.SeekStart {
-		return 0, nil
+		s.offset = 0
+		return s.offset, nil
 	}
 	if whence == io.SeekEnd {
-		return s.size, nil
+		s.offset = s.size
+		return s.offset, nil
 	}
-	return 0, os.ErrInvalid
+	if whence == io.SeekCurrent {
+		return s.offset, nil
+	}
+	return s.offset, os.ErrInvalid
+}
+
+func (s *onlySizeSeekable) Read(p []byte) (n int, err error) {
+	n, err = s.r.Read(p)
+	s.offset += int64(n)
+	return n, err
 }
