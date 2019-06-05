@@ -265,6 +265,19 @@ func (handler *UploadHandler) PostFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	info, err = handler.composer.Core.GetInfo(id)
+	if err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
+	// Directly finish the upload if the upload is empty (i.e. has a size of 0).
+	// This statement is in an else-if block to avoid causing duplicate calls
+	// to finishUploadIfComplete if an upload is empty and contains a chunk.
+	if _, err := handler.writeChunk(id, info, 0, w, r); err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
+
 	handler.sendResp(w, r, http.StatusCreated)
 }
 
@@ -379,6 +392,20 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := handler.composer.LengthDeferrer.DeclareLength(id, uploadLength); err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
+
+
+	info, err = handler.composer.Core.GetInfo(id)
+	if err != nil {
+		handler.sendError(w, r, err)
+		return
+	}
+	// Directly finish the upload if the upload is empty (i.e. has a size of 0).
+	// This statement is in an else-if block to avoid causing duplicate calls
+	// to finishUploadIfComplete if an upload is empty and contains a chunk.
+	if _, err := handler.writeChunk(id, info, 0, w, r); err != nil {
 		handler.sendError(w, r, err)
 		return
 	}
