@@ -3,6 +3,7 @@ package http_
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"github.com/searKing/golib/io_"
 	"io"
 	"mime"
@@ -78,8 +79,21 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 
 		rangeReq := r.Header.Get("Range")
 		if rangeReq != "" {
-			http.Error(w, "range is not support", http.StatusRequestedRangeNotSatisfiable)
-			return
+			ranges, err := parseRange(rangeReq, size)
+			if err != nil {
+				if err == errNoOverlap {
+					w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", size))
+				}
+				http.Error(w, err.Error(), http.StatusRequestedRangeNotSatisfiable)
+				return
+			}
+			for _, r := range ranges {
+				if r.start != 0 {
+					// only Range: bytes=0- is supported for none seekable reader
+					http.Error(w, "range is not support", http.StatusRequestedRangeNotSatisfiable)
+					return
+				}
+			}
 		}
 
 		// Content-Type must be set here, avoid sniff in http.ServeContent for onlySizeSeekable later

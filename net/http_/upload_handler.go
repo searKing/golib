@@ -452,7 +452,7 @@ func (handler *UploadHandler) HeadFile(w http.ResponseWriter, r *http.Request) {
 		lastBytePos:    info.Offset - 1,
 		completeLength: info.Size,
 	}
-	w.Header().Set("Content-Range", cr.contentRange())
+	w.Header().Set("Content-Range", cr.String())
 	handler.sendResp(w, r, http.StatusOK)
 }
 
