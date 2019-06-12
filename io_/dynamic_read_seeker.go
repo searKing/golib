@@ -51,6 +51,15 @@ func (l *dynamicReadSeeker) Seek(offset int64, whence int) (n int64, err error) 
 		return
 	}
 
+	// speed up
+	if whence == io.SeekCurrent && offset == 0 {
+		return
+	}
+
+	if whence == io.SeekStart && offset == l.lastOffset {
+		return
+	}
+
 	if err := l.Close(); err != nil {
 		return 0, err
 	}
