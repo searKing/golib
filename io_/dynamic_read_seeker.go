@@ -2,7 +2,7 @@ package io_
 
 import "io"
 
-// DynamicReadSeeker returns a ReadSeeker that reads from r
+// DynamicReadSeeker returns a ReadSeeker that reads from r got by getter at an offset.
 // The underlying implementation is a *dynamicReadSeeker.
 func DynamicReadSeeker(getter func(off int64) (io.Reader, error), size int64) io.ReadSeeker {
 	return &dynamicReadSeeker{
@@ -11,8 +11,7 @@ func DynamicReadSeeker(getter func(off int64) (io.Reader, error), size int64) io
 	}
 }
 
-// A dynamicReadSeeker reads from getter at offset but limits the size of the file N bytes.
-// Read returns EOF when N <= 0 or when the underlying rs returns EOF.
+// A dynamicReadSeeker reads from r got by getter at an offset.
 type dynamicReadSeeker struct {
 	getter    func(off int64) (io.Reader, error)
 	totalSize int64 // make no sense if rs implements io.Seeker
