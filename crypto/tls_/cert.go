@@ -31,7 +31,7 @@ var ErrInvalidCertificateConfiguration = errors.New("tls configuration is invali
 // certPath: The path to the TLS certificate (pem encoded).
 // Example: certPath=~/cert.pem
 // keyPath: The path to the TLS private key (pem encoded).
-// Example: certPath=~/key.pem
+// Example: keyPath=~/key.pem
 func LoadCertificate(
 	certString, keyString string,
 	certPath, keyPath string,
