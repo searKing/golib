@@ -131,9 +131,7 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 	}
 
 	readseeker = io_.LimitReadSeeker(readseeker, size)
-	if modtime.IsZero() {
-		modtime = time.Now()
-	}
+
 	if stater, ok := content.(io_.Stater); ok {
 		if fi, err := stater.Stat(); err == nil {
 			modtime = fi.ModTime()
