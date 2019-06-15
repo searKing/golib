@@ -2,11 +2,11 @@ package http_
 
 import (
 	"context"
-	"golang.org/x/tools/go/ssa/interp/testdata/src/strings"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // parseURL is just url.Parse. It exists only so that url.Parse can be called
