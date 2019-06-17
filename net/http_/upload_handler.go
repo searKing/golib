@@ -343,7 +343,9 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 	_, err = handler.composer.Core.GetInfo(id)
 	if err != nil {
 		// Interpret os.ErrNotExist as 404 Not Found
-		if !os.IsNotExist(err) {
+		// Ignore the error if the upload could not be found. In this case, the upload
+		// has likely already been removed by another service (e.g. a cron job).
+		if err != tusd.ErrNotFound && !os.IsNotExist(err) {
 			handler.sendError(w, r, err)
 			return
 		}
