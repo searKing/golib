@@ -340,12 +340,14 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = handler.deleteFile(id)
+	_, err = handler.composer.Core.GetInfo(id)
 	if err != nil {
-		if err != tusd.ErrNotFound {
+		// Interpret os.ErrNotExist as 404 Not Found
+		if !os.IsNotExist(err) {
 			handler.sendError(w, r, err)
 			return
 		}
+
 		// Handle 404 Not Found
 		created = true
 	}
@@ -395,7 +397,6 @@ func (handler *UploadHandler) PutFile(w http.ResponseWriter, r *http.Request) {
 		handler.sendError(w, r, err)
 		return
 	}
-
 
 	info, err = handler.composer.Core.GetInfo(id)
 	if err != nil {
