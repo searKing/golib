@@ -130,7 +130,9 @@ func ServeContent(w http.ResponseWriter, r *http.Request, name string, modtime t
 		readseeker = newOnlySizeSeekable(content, size)
 	}
 
-	readseeker = io_.LimitReadSeeker(readseeker, size)
+	if size >= 0 {
+		readseeker = io_.LimitReadSeeker(readseeker, size)
+	}
 
 	if stater, ok := content.(io_.Stater); ok {
 		if fi, err := stater.Stat(); err == nil {
