@@ -19,3 +19,19 @@ func PathExists(path string) (bool, error) {
 	}
 	return false, err
 }
+
+func MakdirAllIfNeeded(path string, perm os.FileMode) (created bool, err error) {
+	dir, _ := filepath.Split(path)
+	has, err := PathExists(dir)
+	if err != nil {
+		return false, err
+	}
+	if has {
+		return false, nil
+	}
+	err = os.MkdirAll(dir, perm)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
