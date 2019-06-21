@@ -348,7 +348,7 @@ func (g *SharedPtr) allocateLocked() (Ptr, error) {
 		}
 		g.x = x
 		go g.backgroundTask(false)
-		go g.recoveryTask(false)
+		g.recoveryTask(true)
 	}
 	return g.x, nil
 
@@ -369,6 +369,7 @@ func (g *SharedPtr) recoveryTask(locked bool) {
 			if t == nil {
 				continue
 			}
+
 			task := t.Clone()
 			select {
 			case <-g.Context().Done():
