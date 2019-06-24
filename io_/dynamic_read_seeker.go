@@ -2,6 +2,7 @@ package io_
 
 import (
 	"io"
+	"sync"
 )
 
 // DynamicReadSeeker returns a ReadSeeker that reads from r got by getter at an offset.
@@ -20,18 +21,20 @@ type dynamicReadSeeker struct {
 
 	rs         io.Reader // underlying readSeeker
 	lastOffset int64     // make no sense if rs implements io.Seeker
+	once       sync.Once
 }
 
 func (l *dynamicReadSeeker) lazyLoad() {
-	if l.getter == nil {
-		return
-	}
+	l.once.Do(func() {
+		if l.getter == nil {
+			return
+		}
 
-	if l.rs == nil {
-		l.rs, _ = l.getter(0)
-		l.lastOffset = 0
-	}
-
+		if l.rs == nil {
+			l.rs, _ = l.getter(0)
+			l.lastOffset = 0
+		}
+	})
 }
 
 func (l *dynamicReadSeeker) Read(p []byte) (n int, err error) {
