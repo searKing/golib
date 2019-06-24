@@ -76,7 +76,7 @@ func (l *dynamicReadSeeker) Seek(offset int64, whence int) (n int64, err error) 
 	case io.SeekCurrent:
 		offset += l.lastOffset
 	case io.SeekEnd:
-		offset += l.totalSize - 1
+		offset += l.totalSize
 	}
 
 	l.rs, err = l.getter(offset)
