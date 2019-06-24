@@ -1,6 +1,8 @@
 package io_
 
-import "io"
+import (
+	"io"
+)
 
 // DynamicReadSeeker returns a ReadSeeker that reads from r got by getter at an offset.
 // The underlying implementation is a *dynamicReadSeeker.
@@ -38,13 +40,24 @@ func (l *dynamicReadSeeker) Read(p []byte) (n int, err error) {
 	if l.rs == nil {
 		return 0, io.EOF
 	}
+
+	if l.lastOffset >= l.totalSize {
+		return 0, io.EOF
+	}
+
 	n, err = l.rs.Read(p)
-	l.lastOffset += int64(n)
+	if n >= 0 {
+		l.lastOffset += int64(n)
+	}
 
 	return
 }
 
 func (l *dynamicReadSeeker) Seek(offset int64, whence int) (n int64, err error) {
+	l.lazyLoad()
+	if l.rs == nil {
+		return 0, errSeeker
+	}
 	if seeker, ok := l.rs.(io.Seeker); ok {
 		n, err = seeker.Seek(offset, whence)
 		l.lastOffset = n
@@ -62,14 +75,6 @@ func (l *dynamicReadSeeker) Seek(offset int64, whence int) (n int64, err error) 
 		return n, nil
 	}
 
-	if err := l.Close(); err != nil {
-		return 0, err
-	}
-
-	if l.getter == nil {
-		return 0, errSeeker
-	}
-
 	switch whence {
 	case io.SeekStart:
 		break
@@ -77,6 +82,19 @@ func (l *dynamicReadSeeker) Seek(offset int64, whence int) (n int64, err error) 
 		offset += l.lastOffset
 	case io.SeekEnd:
 		offset += l.totalSize
+	}
+
+	if offset >= l.totalSize {
+		l.lastOffset = offset
+		return offset, nil
+	}
+
+	if err := l.Close(); err != nil {
+		return 0, err
+	}
+
+	if l.getter == nil {
+		return 0, errSeeker
 	}
 
 	l.rs, err = l.getter(offset)
