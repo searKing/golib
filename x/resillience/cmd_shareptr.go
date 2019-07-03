@@ -9,19 +9,33 @@ import (
 
 type CommandSharedPtr struct {
 	*SharedPtr
+	preHandles  []func() error
+	postHandles []func(err error) error
 }
 
-func NewCommandSharedPtr(ctx context.Context, cmd func() *exec.Cmd, l logrus.FieldLogger) *CommandSharedPtr {
+func NewCommandSharedPtr(ctx context.Context, cmd func() *exec.Cmd,
+	preHandles []func() error, postHandles []func(err error) error,
+	l logrus.FieldLogger) *CommandSharedPtr {
 	resilienceSharedPtr := &CommandSharedPtr{
 		SharedPtr: NewSharedPtr(ctx, func() (Ptr, error) {
 			if cmd == nil {
 				return nil, fmt.Errorf("resillence cmd: empty value")
 			}
-
-			return NewCommand(cmd()), nil
+			cmder := NewCommand(cmd())
+			cmder.AppendPreHandles(preHandles...)
+			cmder.AppendPostHandles(postHandles...)
+			return cmder, nil
 		}, l),
 	}
 	return resilienceSharedPtr
+}
+
+func (g *CommandSharedPtr) AppendPreHandles(h ...func() error) {
+	g.preHandles = append(g.preHandles, h...)
+}
+
+func (g *CommandSharedPtr) AppendPostHandles(h ...func() error) {
+	g.preHandles = append(g.preHandles, h...)
 }
 
 func (g *CommandSharedPtr) GetUntilReady() (*Command, error) {

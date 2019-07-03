@@ -9,6 +9,8 @@ import (
 
 type Command struct {
 	*exec.Cmd
+	preHandles  []func() error
+	postHandles []func(err error) error
 }
 
 func NewCommand(cmd *exec.Cmd) *Command {
@@ -16,6 +18,15 @@ func NewCommand(cmd *exec.Cmd) *Command {
 		Cmd: cmd,
 	}
 }
+
+func (r *Command) AppendPreHandles(h ...func() error) {
+	r.preHandles = append(r.preHandles, h...)
+}
+
+func (r *Command) AppendPostHandles(h ...func(err error) error) {
+	r.postHandles = append(r.postHandles, h...)
+}
+
 func (r *Command) Value() interface{} {
 	return r
 }
@@ -56,5 +67,23 @@ func (r *Command) Run() error {
 	if r == nil || r.Cmd == nil {
 		return fmt.Errorf("command: empty value")
 	}
-	return r.Cmd.Run()
+	for _, h := range r.preHandles {
+		if h == nil {
+			continue
+		}
+		if err := h(); err != nil {
+			return err
+		}
+	}
+
+	runErr := r.Cmd.Run()
+	for _, h := range r.postHandles {
+		if h == nil {
+			continue
+		}
+		if err := h(runErr); err != nil {
+			return err
+		}
+	}
+	return runErr
 }
