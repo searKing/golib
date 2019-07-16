@@ -1,6 +1,7 @@
 package resilience
 
 //go:generate stringer -type Event -trimprefix=Event
+//go:generate jsonenums -type Event
 type Event int
 
 const (
