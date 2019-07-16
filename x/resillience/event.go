@@ -1,6 +1,6 @@
-//go:generate stringer -type=Event
 package resilience
 
+//go:generate stringer -type Event -trimprefix=Event
 type Event int
 
 const (

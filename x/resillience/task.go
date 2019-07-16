@@ -40,6 +40,8 @@ func (t TaskType) String() string {
 	return b.String()
 }
 
+//go:generate stringer -type TaskState -trimprefix=TaskState
+
 type TaskState int
 
 const (
@@ -52,19 +54,6 @@ const (
 	TaskStateButt
 )
 
-func (t TaskState) String() string {
-	return taskState[t]
-}
-
-var taskState = map[TaskState]string{
-	TaskStateNew:               "new",
-	TaskStateRunning:           "running",
-	TaskStateDoneErrorHappened: "done_error_happened",
-	TaskStateDoneNormally:      "done_normally",
-	TaskStateDormancy:          "dormancy",
-	TaskStateDeath:             "death",
-}
-
 type Task struct {
 	Type        TaskType
 	State       TaskState
@@ -74,8 +63,8 @@ type Task struct {
 	RepeatDuration time.Duration
 	RetryDuration  time.Duration
 
-	ctx        context.Context
-	cancelFn   context.CancelFunc
+	Ctx        context.Context
+	CancelFn   context.CancelFunc
 	inShutdown bool
 }
 
@@ -83,8 +72,8 @@ type Task struct {
 // The returned context is always non-nil; it defaults to the
 // background context.
 func (t *Task) Context() context.Context {
-	if t.ctx != nil {
-		return t.ctx
+	if t.Ctx != nil {
+		return t.Ctx
 	}
 	return context.Background()
 }
